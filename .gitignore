@@ -1,0 +1,5 @@
+_deploy/
+.claude/
+EventHub_Gantt.html
+*.bak
+.DS_Store

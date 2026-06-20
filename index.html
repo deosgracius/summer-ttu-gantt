@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Software Engineering Lab · Gantt & Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============ THEME TOKENS (shadcn/ui neutral) ============ */
+:root{
+  --r:12px; --r-sm:9px; --r-xs:7px;
+  --deo:#0ea5e9; --can:#8b5cf6; --both:#f59e0b; --ok:#16a34a; --bad:#dc2626;
+  --font:"Geist","Inter",system-ui,-apple-system,sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --maxw:1240px;
+  --accent-grad:linear-gradient(90deg,var(--deo),var(--can));
+}
+[data-theme="dark"]{
+  --bg:#0a0a0a;
+  --panel:#171717; --panel-solid:#171717; --panel2:rgba(255,255,255,.04);
+  --line:rgba(255,255,255,.10); --line-strong:rgba(255,255,255,.16);
+  --txt:#fafafa; --txt2:#d4d4d4; --mut:#a1a1a1; --faint:#6b6b6b;
+  --primary:#fafafa; --primary-fg:#0a0a0a;
+  --bar-shadow:0 1px 2px rgba(0,0,0,.6);
+  --card-shadow:0 1px 2px rgba(0,0,0,.4);
+  --card-shadow-hover:0 8px 24px rgba(0,0,0,.5);
+  --grid-line:rgba(255,255,255,.06);
+  --track-alt:rgba(255,255,255,.015);
+  --sec-bg:rgba(255,255,255,.035);
+  --input-bg:rgba(255,255,255,.03);
+  --glow:0 0 0;
+}
+[data-theme="light"]{
+  --bg:#fafafa;
+  --panel:#ffffff; --panel-solid:#ffffff; --panel2:#f5f5f5;
+  --line:#e5e5e5; --line-strong:#d4d4d4;
+  --txt:#0a0a0a; --txt2:#404040; --mut:#737373; --faint:#a3a3a3;
+  --primary:#171717; --primary-fg:#fafafa;
+  --bar-shadow:0 1px 2px rgba(0,0,0,.08);
+  --card-shadow:0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --card-shadow-hover:0 4px 16px rgba(0,0,0,.08);
+  --grid-line:#f0f0f0;
+  --track-alt:#fafafa;
+  --sec-bg:#f7f7f7;
+  --input-bg:#ffffff;
+  --glow:0 0 0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--txt); font-family:var(--font); min-height:100vh; font-size:14px;
+  -webkit-font-smoothing:antialiased; letter-spacing:-0.011em;
+}
+.mono{font-family:var(--mono)}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:22px clamp(14px,3.2vw,40px) 70px}
+button{font-family:var(--font); cursor:pointer; border:0}
+::-webkit-scrollbar{height:11px;width:11px}
+::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:20px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ GATE · Notus auth on "Background Paths" ============ */
+#gate{position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px;
+  background:#fafafa;}
+#bgpaths{position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0}
+#bgpaths svg{position:absolute; inset:0; width:100%; height:100%}
+#bgpaths path{animation-name:pathbreathe; animation-iteration-count:infinite; animation-timing-function:ease-in-out}
+@keyframes pathbreathe{0%,100%{opacity:.30}50%{opacity:.95}}
+.notus-card{position:relative; z-index:1; width:min(420px,94vw); background:#ffffff; border:1px solid #e8edf3; border-radius:10px;
+  box-shadow:0 18px 40px rgba(15,23,42,.12),0 4px 12px rgba(15,23,42,.06);
+  animation:rise .5s cubic-bezier(.2,.8,.2,1)}
+.notus-body{padding:36px 34px 40px}
+.notus-brand{text-align:center; margin-bottom:6px}
+.notus-logo{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;
+  background:#1a202c; box-shadow:0 4px 10px rgba(26,32,44,.35)}
+.notus-logo svg path{stroke:#fff}
+.notus-brand h1{margin:0; font-size:24px; font-weight:700; color:#2d3748; letter-spacing:-.02em}
+.notus-brand p{margin:5px 0 0; color:#8a99ad; font-size:13px; font-weight:500}
+.notus-divider{display:flex; align-items:center; gap:12px; margin:26px 0 22px; color:#a0aec0}
+.notus-divider::before,.notus-divider::after{content:""; flex:1; height:1px; background:#cbd5e0}
+.notus-divider span{font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap}
+.notus-label{display:block; text-transform:uppercase; color:#4a5568; font-size:11px; font-weight:700; letter-spacing:.02em; margin-bottom:8px}
+.notus-input{width:100%; border:1px solid #e2e8f0; padding:13px 14px; color:#4a5568; background:#f8fafc; border-radius:6px; font-size:14px;
+  box-shadow:inset 0 1px 2px rgba(15,23,42,.04); outline:none; transition:box-shadow .15s, border-color .15s; font-family:var(--font); letter-spacing:.1em}
+.notus-input::placeholder{color:#cbd5e0; letter-spacing:0}
+.notus-input:focus{border-color:#38bdf8; box-shadow:0 0 0 3px rgba(56,189,248,.35)}
+.notus-btn{width:100%; margin-top:22px; padding:13px; border-radius:6px; font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:.03em;
+  background:#1a202c; color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.2); transition:box-shadow .15s, background .15s}
+.notus-btn:hover{box-shadow:0 8px 18px rgba(0,0,0,.32)}
+.notus-btn:active{background:#4a5568}
+.notus-btn:disabled{opacity:.6; cursor:wait}
+.gateerr{color:#dc2626; font-size:12.5px; min-height:16px; margin-top:11px; font-weight:600; text-align:center}
+.notus-foot{position:relative; z-index:1; margin-top:22px; color:#64748b; font-size:12.5px; font-weight:500; text-align:center}
+@keyframes rise{from{opacity:0;transform:translateY(16px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ============ TOPBAR ============ */
+.topbar{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px}
+.brand{display:flex; align-items:center; gap:13px; min-width:0}
+.brand .mark{width:40px;height:40px;border-radius:11px;flex:none;display:grid;place-items:center;
+  background:var(--primary)}
+.brand .mark svg path{stroke:var(--primary-fg)}
+.brand .ttl{min-width:0}
+.brand h1{margin:0; font-size:clamp(19px,2.4vw,25px); font-weight:600; letter-spacing:-.025em; line-height:1.1;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.brand .sub{margin:2px 0 0; color:var(--mut); font-size:12px; letter-spacing:.02em}
+.spacer{flex:1}
+.tbtn{display:inline-flex; align-items:center; gap:7px; padding:8px 13px; border-radius:9px; font-size:12.5px; font-weight:600;
+  background:var(--panel); border:1px solid var(--line); color:var(--txt2); transition:.15s}
+.tbtn:hover{background:var(--panel2); color:var(--txt)}
+.tbtn.primary{background:var(--primary); color:var(--primary-fg); border:1px solid var(--primary)}
+.tbtn.primary:hover{opacity:.9; background:var(--primary)}
+.tbtn.on{background:var(--primary); color:var(--primary-fg); border:1px solid var(--primary)}
+.tbtn svg{width:15px;height:15px}
+.sync{display:inline-flex; align-items:center; gap:7px; font-size:11.5px; color:var(--mut); padding:7px 11px; border-radius:11px;
+  background:var(--panel); border:1px solid var(--line)}
+.sync .dot{width:8px;height:8px;border-radius:50%;background:var(--ok); box-shadow:0 0 10px var(--ok)}
+.sync.saving .dot{background:var(--both); box-shadow:0 0 10px var(--both); animation:pulse 1s infinite}
+.sync.off .dot{background:var(--bad); box-shadow:0 0 10px var(--bad)}
+@keyframes pulse{50%{opacity:.35}}
+
+/* ============ DASHBOARD ============ */
+.dash{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:18px}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
+  padding:18px 19px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; transition:box-shadow .2s, border-color .2s}
+.card:hover{box-shadow:var(--card-shadow-hover); border-color:var(--line-strong)}
+.card .k{font-size:11px; color:var(--mut); font-weight:500; letter-spacing:.04em; text-transform:uppercase; display:flex; align-items:center; gap:7px}
+.card .v{font-size:30px; font-weight:700; margin-top:8px; line-height:1; letter-spacing:-.02em}
+.card .v small{font-size:14px; color:var(--mut); font-weight:600}
+.card .meta{font-size:11.5px; color:var(--mut); margin-top:7px}
+.ring{position:absolute; right:-18px; top:-18px; width:90px; height:90px; opacity:.9}
+.pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:10.5px; font-weight:800; letter-spacing:.03em}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent); color:var(--ok)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad)}
+.pbar{height:7px; border-radius:99px; background:var(--panel2); overflow:hidden; margin-top:10px; border:1px solid var(--line)}
+.pbar i{display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--deo),var(--can)); transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.owners{display:flex; flex-direction:column; gap:9px; margin-top:3px}
+.orow{display:flex; align-items:center; gap:9px; font-size:12px}
+.orow .nm{width:64px; font-weight:700; display:flex; align-items:center; gap:6px}
+.orow .nm .d{width:9px;height:9px;border-radius:3px}
+.orow .ob{flex:1; height:8px; border-radius:99px; background:var(--panel2); overflow:hidden; border:1px solid var(--line)}
+.orow .ob i{display:block;height:100%;border-radius:99px; transition:width .6s}
+.orow .pc{width:34px; text-align:right; color:var(--mut); font-weight:700; font-size:11px}
+
+/* ============ CONTROLS ============ */
+.controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px}
+.search{display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:0 11px}
+.search input{background:transparent; border:0; outline:none; color:var(--txt); padding:9px 0; font-size:13px; width:170px; font-family:var(--font)}
+.search svg{width:15px;height:15px;color:var(--mut)}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.chip{padding:7px 13px; border-radius:8px; font-size:12px; font-weight:500; background:var(--panel); border:1px solid var(--line); color:var(--txt2); transition:.15s}
+.chip:hover{border-color:var(--line-strong); background:var(--panel2)}
+.chip.active{color:var(--primary-fg); border:1px solid var(--primary); font-weight:600}
+.chip .d{display:inline-block; width:8px;height:8px;border-radius:50%; margin-right:6px; vertical-align:middle}
+.legend{display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--txt2); margin-left:auto; align-items:center}
+.legend b{display:inline-flex; align-items:center; gap:7px; font-weight:600}
+.legend .d{width:11px;height:11px;border-radius:4px}
+
+/* ============ GANTT ============ */
+.gwrap{border:1px solid var(--line); border-radius:var(--r); overflow:auto; background:var(--panel);
+  position:relative; box-shadow:var(--card-shadow); max-height:76vh}
+.grid{display:grid; position:relative; min-width:860px}
+.gh{position:sticky; top:0; z-index:6; background:var(--panel-solid); border-bottom:1px solid var(--line-strong)}
+.cell{padding:9px 10px; border-right:1px solid var(--grid-line); font-size:11px}
+.wk{text-align:center}
+.wk .l{font-weight:600; font-size:12px; letter-spacing:0}
+.wk .r{color:var(--mut); font-size:9.5px; margin-top:1px}
+.wk.isnow .l{color:var(--ok)}
+.namecell{position:sticky; left:0; z-index:5; background:var(--panel-solid); border-right:1px solid var(--line-strong);
+  padding:8px 13px; font-size:12.5px; display:flex; align-items:center; gap:9px; min-width:264px; max-width:264px}
+.namecell .d{width:9px;height:9px;border-radius:50%; flex:none}
+.namecell .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.gh.namecell{font-weight:500; font-size:11px; letter-spacing:.03em; text-transform:uppercase; color:var(--mut)}
+.sec{grid-column:1/-1; background:var(--sec-bg); border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  padding:9px 14px; font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--txt2);
+  position:sticky; left:0; display:flex; align-items:center; gap:10px}
+.sec .cnt{color:var(--mut); font-weight:500; letter-spacing:.02em}
+.sec .secbar{flex:1; max-width:160px; height:6px; border-radius:99px; background:var(--panel2); overflow:hidden; border:1px solid var(--line)}
+.sec .secbar i{display:block;height:100%;background:linear-gradient(90deg,var(--deo),var(--can))}
+.track{position:relative; border-bottom:1px solid var(--grid-line); height:38px; grid-column:2/-1}
+.track:nth-of-type(even){background:var(--track-alt)}
+.bar{position:absolute; top:7px; height:24px; border-radius:7px; display:flex; align-items:center; padding:0 9px;
+  font-size:10.5px; color:rgba(0,0,0,.82); font-weight:600; overflow:hidden; box-shadow:var(--bar-shadow); white-space:nowrap;
+  transition:transform .12s, box-shadow .12s; cursor:default}
+.bar:hover{transform:translateY(-1px) scale(1.005)}
+.bar .fill{position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.32)}
+.bar .stripe{position:absolute; inset:0; background:repeating-linear-gradient(45deg,transparent,transparent 7px,rgba(0,0,0,.06) 7px,rgba(0,0,0,.06) 14px); opacity:.5}
+.bar .lbl{position:relative; z-index:1; text-shadow:0 1px 1px rgba(255,255,255,.35)}
+.bar.done{box-shadow:var(--bar-shadow), inset 0 0 0 1.5px rgba(255,255,255,.6)}
+.editing .bar{cursor:pointer}
+.nowcol{position:absolute; top:0; bottom:0; border-left:2px dashed var(--ok); z-index:4; pointer-events:none;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--ok) 12%,transparent),transparent 60%)}
+.nowtag{position:absolute; top:0; transform:translateX(-50%); background:var(--ok); color:#04140d; font-size:9px; font-weight:900;
+  padding:2px 8px; border-radius:0 0 7px 7px; letter-spacing:.12em}
+.hovlayer{position:absolute; top:0; bottom:0; z-index:3}
+.hstrip{position:absolute; top:0; bottom:0; transition:background .1s}
+.hstrip:hover{background:color-mix(in srgb,var(--deo) 7%,transparent)}
+.mini{margin-left:auto; border:0; background:var(--panel2); color:var(--txt2); border-radius:6px; width:22px;height:22px;
+  font-size:12px; display:none; align-items:center; justify-content:center; line-height:1}
+.editing .namecell .mini{display:inline-flex}
+.mini:hover{color:var(--txt); background:var(--line)}
+.mini.del:hover{background:color-mix(in srgb,var(--bad) 22%,transparent); color:var(--bad)}
+.namecell .acts{display:flex; gap:4px; margin-left:6px}
+
+/* ============ TOOLTIP ============ */
+#tip{position:fixed; z-index:120; max-width:330px; background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:14px;
+  padding:13px 15px; box-shadow:var(--card-shadow); font-size:12px; pointer-events:none; opacity:0; transition:opacity .12s; backdrop-filter:blur(20px)}
+#tip h4{margin:0 0 9px; font-size:12.5px; display:flex; justify-content:space-between; gap:10px}
+#tip h4 span{color:var(--mut); font-weight:500}
+#tip .grp{margin:8px 0 0}
+#tip .who{font-weight:800; font-size:11px; display:flex; align-items:center; gap:7px; margin-bottom:3px}
+#tip .who .d{width:9px;height:9px;border-radius:3px}
+#tip ul{margin:2px 0 0; padding-left:17px; color:var(--txt2)}
+#tip li{margin:2px 0}
+#tip li b{color:var(--mut); font-weight:600; font-family:var(--mono); font-size:10.5px}
+#tip .none{color:var(--faint); font-style:italic; font-size:11px}
+
+/* ============ MODAL ============ */
+.modal{position:fixed; inset:0; background:rgba(6,10,18,.62); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; z-index:150; padding:18px}
+.modal.show{display:flex; animation:fade .2s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:20px; padding:24px; width:min(480px,94vw);
+  box-shadow:var(--card-shadow); max-height:92vh; overflow:auto; animation:rise .25s cubic-bezier(.2,.8,.2,1)}
+.sheet h3{margin:0 0 4px; font-size:18px}
+.sheet .hint{color:var(--mut); font-size:12px; margin:0 0 16px}
+.field{margin-top:13px}
+.field label{display:block; font-size:11px; color:var(--mut); font-weight:700; letter-spacing:.04em; text-transform:uppercase; margin-bottom:5px}
+.field input,.field select{width:100%; padding:10px 12px; border:1px solid var(--line-strong); border-radius:10px; font-size:13.5px;
+  color:var(--txt); background:var(--input-bg); outline:none; font-family:var(--font); transition:.15s}
+.field input:focus,.field select:focus{border-color:var(--deo); box-shadow:var(--glow) color-mix(in srgb,var(--deo) 30%,transparent)}
+.row2{display:flex; gap:12px}.row2 .field{flex:1}
+.ownerseg{display:flex; gap:7px}
+.ownerseg button{flex:1; padding:10px; border-radius:9px; border:1px solid var(--line-strong); background:var(--input-bg); color:var(--txt2); font-weight:500; font-size:12.5px; display:flex; align-items:center; justify-content:center; gap:7px}
+.ownerseg button .d{width:10px;height:10px;border-radius:3px}
+.ownerseg button.sel{color:#fff; border:0; font-weight:600}
+.rangewrap{display:flex; align-items:center; gap:12px; margin-top:6px}
+.rangewrap input[type=range]{flex:1; accent-color:var(--deo)}
+.rangeval{font-family:var(--mono); font-weight:800; font-size:15px; width:48px; text-align:right}
+.acts2{display:flex; gap:10px; margin-top:22px; align-items:center}
+.acts2 button{padding:10px 17px; border-radius:9px; font-weight:600; font-size:13.5px; transition:.15s}
+.btn-save{background:var(--primary); color:var(--primary-fg)}
+.btn-save:hover{opacity:.9}
+.btn-ghost{background:var(--input-bg); border:1px solid var(--line-strong); color:var(--txt2)}
+.btn-ghost:hover{background:var(--panel2)}
+.btn-del{background:color-mix(in srgb,var(--bad) 16%,transparent); color:var(--bad); margin-left:auto}
+.btn-del:hover{background:color-mix(in srgb,var(--bad) 26%,transparent)}
+.sheet .seterr{color:var(--bad); font-size:12px; margin-top:10px; font-weight:600; min-height:14px}
+.divider{height:1px; background:var(--line); margin:18px 0}
+.skel{height:76vh; border-radius:var(--r); background:linear-gradient(100deg,var(--panel2),var(--panel) 40%,var(--panel2) 80%); background-size:200% 100%; animation:sh 1.4s infinite; border:1px solid var(--line)}
+@keyframes sh{to{background-position:-200% 0}}
+.toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel-solid); color:var(--txt);
+  border:1px solid var(--line-strong); border-radius:12px; padding:11px 18px; font-size:13px; font-weight:600; box-shadow:var(--card-shadow);
+  opacity:0; transition:.3s; z-index:300; pointer-events:none}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+@media (max-width:640px){.namecell{min-width:170px;max-width:170px}.legend{display:none}}
+
+/* ============ TABS ============ */
+.tabs{display:flex; gap:4px; margin-bottom:18px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:4px; width:fit-content}
+.tab{display:inline-flex; align-items:center; gap:8px; padding:8px 17px; border-radius:7px; font-size:13px; font-weight:500; background:transparent; color:var(--mut); transition:.15s}
+.tab svg{width:16px;height:16px}
+.tab:hover{color:var(--txt2)}
+.tab.active{background:var(--panel); color:var(--txt); font-weight:600; box-shadow:var(--card-shadow)}
+
+/* ============ BUDGET ============ */
+.bdash{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:14px; margin-bottom:16px}
+@media (max-width:820px){.bdash{grid-template-columns:1fr}}
+.tcard .timeline{margin-top:14px}
+.tline{position:relative; height:8px; border-radius:99px; background:var(--panel2); border:1px solid var(--line); margin:22px 0 8px}
+.tline i{position:absolute; left:0; top:0; bottom:0; border-radius:99px; background:linear-gradient(90deg,var(--deo),var(--can))}
+.tline .now{position:absolute; top:50%; width:15px;height:15px; border-radius:50%; background:var(--ok); transform:translate(-50%,-50%); box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent), 0 0 12px var(--ok)}
+.tdates{display:flex; justify-content:space-between; font-size:11px; color:var(--mut)}
+.tdates b{display:block; color:var(--txt); font-size:12.5px; font-weight:700; margin-top:2px}
+.tdates .mid{text-align:center; color:var(--ok)}
+.tdates .end{text-align:right}
+.bhero .v{font-size:34px}
+.bhero.est .v{background:linear-gradient(90deg,var(--both),var(--can));-webkit-background-clip:text;background-clip:text;color:transparent}
+.bhero.act .v{background:linear-gradient(90deg,var(--deo),var(--ok));-webkit-background-clip:text;background-clip:text;color:transparent}
+.bcmp{font-size:11.5px; color:var(--mut); margin-top:9px}
+
+.btable{background:var(--panel); backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); overflow:hidden; margin-bottom:14px}
+.bth{display:grid; grid-template-columns:1.6fr repeat(2,1fr); gap:10px; padding:12px 18px; background:var(--sec-bg); border-bottom:1px solid var(--line); font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--mut)}
+.bth .cat{color:var(--deo); font-size:12px; letter-spacing:.06em}
+.bth .col{text-align:right}
+.bth .col.act{color:var(--ok)}
+.brow{display:grid; grid-template-columns:1.6fr repeat(2,1fr); gap:10px; padding:9px 18px; border-bottom:1px solid var(--grid-line); align-items:center; font-size:13px}
+.brow:last-child{border-bottom:0}
+.brow .nm{color:var(--txt2); display:flex; align-items:center; gap:8px}
+.brow .sub{font-size:11px; color:var(--mut)}
+.brow .val{text-align:right; font-family:var(--mono); font-weight:600}
+.brow .val.act{color:var(--ok)}
+.brow.tot{background:var(--panel2); font-weight:800}
+.brow.tot .nm{color:var(--txt); font-weight:800}
+.brow.tot .val{font-size:14px}
+.brow.grand{background:linear-gradient(90deg,color-mix(in srgb,var(--deo) 12%,transparent),color-mix(in srgb,var(--can) 12%,transparent))}
+.brow.grand .val{font-size:17px; font-weight:900}
+.brow.oh .nm{color:var(--mut); font-style:italic}
+.bin{width:100%; max-width:108px; padding:6px 8px; border:1px solid var(--line-strong); border-radius:8px; background:var(--input-bg); color:var(--txt); font-family:var(--mono); font-size:12.5px; text-align:right; outline:none}
+.bin.nm{text-align:left; max-width:none; font-family:var(--font)}
+.bin:focus{border-color:var(--deo)}
+.brow .ed{display:flex; gap:7px; justify-content:flex-end; align-items:center}
+.brow .ed small{color:var(--mut); font-size:10px}
+.bdel{border:0; background:var(--panel2); color:var(--mut); width:24px;height:24px;border-radius:6px;font-size:14px;flex:none}
+.bdel:hover{background:color-mix(in srgb,var(--bad) 22%,transparent); color:var(--bad)}
+.baddrow{padding:10px 18px}
+.badd{background:var(--input-bg); border:1px dashed var(--line-strong); color:var(--txt2); padding:8px 14px; border-radius:9px; font-size:12px; font-weight:700}
+.badd:hover{border-color:var(--deo); color:var(--txt)}
+.bnote{font-size:12px; color:var(--mut); background:color-mix(in srgb,var(--both) 9%,transparent); border:1px solid color-mix(in srgb,var(--both) 30%,transparent); border-radius:12px; padding:11px 15px; margin-bottom:14px}
+.bnote b{color:var(--txt)}
+.editpanel{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; font-size:12.5px; color:var(--mut)}
+.editpanel .ip{display:flex; align-items:center; gap:7px}
+.editpanel input{padding:6px 9px; border:1px solid var(--line-strong); border-radius:8px; background:var(--input-bg); color:var(--txt); font-size:12.5px; outline:none}
+</style>
+</head>
+<body>
+
+<!-- ============ GATE ============ -->
+<div id="gate">
+  <div id="bgpaths"></div>
+  <div class="notus-card">
+    <div class="notus-body">
+      <div class="notus-brand">
+        <div class="notus-logo"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M7 3v4M17 3v4M3 9h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M8 14h5M8 17h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h1>Summer Timeline</h1>
+        <p>Project Gantt &amp; Budget</p>
+      </div>
+      <div class="notus-divider"><span>Sign in with passcode</span></div>
+      <label class="notus-label" for="gatepass">Team passcode</label>
+      <input id="gatepass" class="notus-input" type="password" placeholder="Enter passcode" autocomplete="off" autofocus>
+      <div class="gateerr" id="gateerr"></div>
+      <button id="gatebtn" class="notus-btn">Sign In</button>
+    </div>
+  </div>
+  <div class="notus-foot">Private workspace · for internal team use only</div>
+</div>
+
+<!-- ============ APP ============ -->
+<div class="wrap" id="app" style="display:none">
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 13l4 4L21 5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="ttl"><h1 id="appTitle">Summer Timeline</h1><div class="sub" id="appSub">Weekly plan</div></div>
+    </div>
+    <div class="spacer"></div>
+    <span class="sync" id="sync"><span class="dot"></span><span id="syncTxt">Live</span></span>
+    <button class="tbtn" id="themeBtn" title="Toggle theme"></button>
+    <button class="tbtn" id="settingsBtn" title="Settings"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.6"/></svg> Settings</button>
+    <button class="tbtn" id="editBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit</button>
+    <button class="tbtn" id="logoutBtn" title="Sign out"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out</button>
+    <button class="tbtn primary" id="addBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Add task</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="timeline"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h10M4 12h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Timeline</button>
+    <button class="tab" data-view="budget"><svg viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Budget</button>
+  </div>
+
+  <div id="viewTimeline">
+  <div class="dash" id="dash"></div>
+
+  <div class="controls">
+    <div class="search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="search" placeholder="Search tasks…"></div>
+    <div class="chips" id="ownerChips"></div>
+    <div class="legend">
+      <b><span class="d" style="background:var(--deo)"></span>Deo · Backend</b>
+      <b><span class="d" style="background:var(--can)"></span>Cannon · Frontend</b>
+      <b><span class="d" style="background:var(--both)"></span>Shared</b>
+    </div>
+  </div>
+
+  <div class="gwrap"><div class="grid" id="grid"><div class="skel"></div></div>
+    <div class="hovlayer" id="hov"></div>
+    <div class="nowcol" id="nowcol"><span class="nowtag">NOW</span></div>
+  </div>
+  </div><!-- /viewTimeline -->
+
+  <div id="viewBudget" style="display:none"></div>
+</div>
+
+<div id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ============ TASK MODAL ============ -->
+<div class="modal" id="taskModal"><div class="sheet">
+  <h3 id="tmTitle">Edit task</h3>
+  <p class="hint">Changes save to the shared timeline for everyone.</p>
+  <div class="field"><label>Task name</label><input id="f_name" placeholder="e.g. Booking endpoints"></div>
+  <div class="field"><label>Section</label><input id="f_section" list="secList" placeholder="e.g. Backend Development"><datalist id="secList"></datalist></div>
+  <div class="field"><label>Owner</label>
+    <div class="ownerseg" id="f_owner">
+      <button data-o="Deo"><span class="d" style="background:var(--deo)"></span>Deo</button>
+      <button data-o="Cannon"><span class="d" style="background:var(--can)"></span>Cannon</button>
+      <button data-o="Both"><span class="d" style="background:var(--both)"></span>Shared</button>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="field"><label>Start week</label><select id="f_w0"></select></div>
+    <div class="field"><label>End week</label><select id="f_w1"></select></div>
+  </div>
+  <div class="field"><label>Completion</label>
+    <div class="rangewrap"><input type="range" id="f_comp" min="0" max="100" step="5"><span class="rangeval" id="f_compVal">0%</span></div>
+  </div>
+  <div class="row2">
+    <div class="field"><label>Estimated hours</label><input id="f_est" type="number" min="0" step="0.5" placeholder="0"></div>
+    <div class="field"><label>Logged hours</label><input id="f_log" type="number" min="0" step="0.5" placeholder="0"></div>
+  </div>
+  <div class="seterr" id="tmErr"></div>
+  <div class="acts2">
+    <button class="btn-save" id="tmSave">Save task</button>
+    <button class="btn-ghost" id="tmCancel">Cancel</button>
+    <button class="btn-del" id="tmDel">Delete</button>
+  </div>
+</div></div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal" id="setModal"><div class="sheet">
+  <h3>Settings</h3>
+  <p class="hint">Shared across the whole team.</p>
+  <div class="field"><label>Project title</label><input id="s_title"></div>
+  <div class="field"><label>Subtitle</label><input id="s_sub"></div>
+  <div class="field"><label>Current week (NOW marker)</label><select id="s_now"></select></div>
+  <div class="acts2"><button class="btn-save" id="sSave">Save</button><button class="btn-ghost" id="sCancel">Close</button></div>
+  <div class="divider"></div>
+  <h3 style="font-size:15px">Change passcode</h3>
+  <div class="row2">
+    <div class="field"><label>Current</label><input id="s_old" type="password" autocomplete="off"></div>
+    <div class="field"><label>New (min 4)</label><input id="s_new" type="password" autocomplete="off"></div>
+  </div>
+  <div class="seterr" id="sErr"></div>
+  <div class="acts2"><button class="btn-save" id="sPass">Update passcode</button></div>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ====================== CONFIG ====================== */
+const SUPA_URL = "https://lwyofgkqrtkcoagxamcz.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3eW9mZ2txcnRrY29hZ3hhbWN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0ODM0NTksImV4cCI6MjA5NzA1OTQ1OX0.yUJ5mcg0pGzNjXAJlM41H0F_dam57Ql0ycpdbDD-4R0";
+const POLL_MS = 6000;
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+const COLOR = {Deo:"var(--deo)", Cannon:"var(--can)", Both:"var(--both)"};
+const OWNERS = {Deo:"Deo · Backend", Cannon:"Cannon · Frontend", Both:"Shared"};
+
+/* ====================== STATE ====================== */
+let PASS = sessionStorage.getItem("eh_pass") || "";
+let cfg = {title:"", subtitle:"", weeks:[], now_week:0};
+let tasks = [];
+let editMode=false, editingId=null, modalOpen=false, lastSig="";
+let filterOwner="All", filterText="";
+let budget={}, curView="timeline";
+const $ = s=>document.querySelector(s);
+const esc = s=>(s+"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const NW = ()=>cfg.weeks.length;
+const fmtH = n=>{n=+n||0; return Number.isInteger(n)?n:n.toFixed(1);};
+
+/* ====================== API ====================== */
+async function rpc(fn, args){ const {data,error}=await sb.rpc(fn,args); if(error) throw error; return data; }
+async function apiLoad(){ const d=await rpc("gantt_load",{p:PASS}); return d; }
+async function apiSave(t){ return rpc("gantt_save",{p:PASS,t}); }
+async function apiDelete(id){ return rpc("gantt_delete",{p:PASS,tid:id}); }
+async function apiSetNow(n){ return rpc("gantt_set_now",{p:PASS,n}); }
+async function apiSetMeta(t,s){ return rpc("gantt_set_meta",{p:PASS,new_title:t,new_subtitle:s}); }
+async function apiSetPass(o,n){ return rpc("gantt_set_passcode",{p_old:o,p_new:n}); }
+async function apiSetBudget(b){ return rpc("gantt_set_budget",{p:PASS,b}); }
+
+/* ====================== GATE ====================== */
+async function tryUnlock(p){
+  const btn=$("#gatebtn"); btn.disabled=true; btn.textContent="Unlocking…"; $("#gateerr").textContent="";
+  try{
+    PASS=p; const d=await apiLoad(); apply(d); PASS=p; sessionStorage.setItem("eh_pass",p);
+    $("#gate").style.display="none"; $("#app").style.display="";
+    startPolling();
+  }catch(e){
+    PASS=""; sessionStorage.removeItem("eh_pass");
+    $("#gateerr").textContent = (e.code==="28000"||/unauthorized/i.test(e.message||"")) ? "Incorrect passcode." : "Connection error — try again.";
+    $("#gatepass").select();
+  }finally{ btn.disabled=false; btn.textContent="Unlock"; }
+}
+$("#gatebtn").onclick=()=>tryUnlock($("#gatepass").value.trim());
+$("#gatepass").addEventListener("keydown",e=>{if(e.key==="Enter")tryUnlock($("#gatepass").value.trim());});
+
+/* ====================== DATA APPLY ====================== */
+function apply(d){
+  cfg = d.config || cfg;
+  budget = (cfg.budget && Object.keys(cfg.budget).length) ? cfg.budget : defaultBudget();
+  tasks = (d.tasks||[]).map(t=>({...t, comp:+t.comp||0, w0:+t.w0||0, w1:+t.w1||0, est_hours:+t.est_hours||0, logged_hours:+t.logged_hours||0, sort_order:+t.sort_order||0}));
+  lastSig = JSON.stringify(d);
+  $("#appTitle").textContent = cfg.title || "Software Engineering Lab";
+  $("#appSub").textContent = cfg.subtitle || "";
+  document.title = (cfg.title||"Software Engineering Lab")+" · Gantt & Budget";
+  renderAll();
+}
+function defaultBudget(){ return {start:"2026-06-03",today:"2026-06-17",end:"2026-08-05",labor:[],laborOhRate:1,contract:[],material:[],rental:[],bizOhRate:0.55}; }
+
+/* ====================== POLLING (live sync) ====================== */
+let pollTimer=null;
+function startPolling(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(poll, POLL_MS); }
+async function poll(){
+  if(modalOpen) return;            // don't clobber an open editor
+  const ae=document.activeElement;
+  if(ae && ae.closest && ae.closest("#viewBudget") && ae.tagName==="INPUT") return; // mid budget edit
+  try{
+    setSync("live");
+    const d=await apiLoad();
+    if(JSON.stringify(d)!==lastSig){ apply(d); flashSync(); }
+  }catch(e){ setSync("off"); }
+}
+function setSync(s){ const el=$("#sync"); el.className="sync"+(s==="off"?" off":s==="saving"?" saving":"");
+  $("#syncTxt").textContent = s==="off"?"Offline":s==="saving"?"Saving…":"Live"; }
+let flashT; function flashSync(){ $("#syncTxt").textContent="Updated"; clearTimeout(flashT); flashT=setTimeout(()=>setSync("live"),1200); }
+
+/* ====================== RENDER: DASHBOARD ====================== */
+function ringSvg(pct){ const r=30,c=2*Math.PI*r,off=c*(1-pct/100);
+  return `<svg class="ring" viewBox="0 0 80 80"><circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--line)" stroke-width="7"/>
+   <circle cx="40" cy="40" r="${r}" fill="none" stroke="url(#g1)" stroke-width="7" stroke-linecap="round"
+   stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 40 40)"/>
+   <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--deo)"/><stop offset="1" stop-color="var(--can)"/></linearGradient></defs></svg>`; }
+
+function renderDash(){
+  const total=tasks.length;
+  const done=tasks.filter(t=>t.comp>=100).length;
+  const avg= total? Math.round(tasks.reduce((s,t)=>s+t.comp,0)/total):0;
+  const est=tasks.reduce((s,t)=>s+t.est_hours,0);
+  const log=tasks.reduce((s,t)=>s+t.logged_hours,0);
+  const hPct= est? Math.min(100,Math.round(log/est*100)):0;
+  // expected progress by schedule
+  const nw=cfg.now_week, tw=NW()||1;
+  const expected=Math.round(Math.min(1,(nw+1)/tw)*100);
+  const onTrack=avg>=expected-8;
+  const ownerStats=o=>{const a=tasks.filter(t=>t.owner===o); const p=a.length?Math.round(a.reduce((s,t)=>s+t.comp,0)/a.length):0; return {n:a.length,p};};
+  const dStats=["Deo","Cannon","Both"].map(o=>({o,...ownerStats(o)}));
+
+  $("#dash").innerHTML = `
+   <div class="card">${ringSvg(avg)}<div class="k">Overall progress</div>
+     <div class="v">${avg}<small>%</small></div>
+     <div class="meta">${done} of ${total} tasks complete</div></div>
+   <div class="card"><div class="k">Schedule</div>
+     <div class="v" style="font-size:22px">Week ${nw+1}<small> / ${tw}</small></div>
+     <div class="meta"><span class="pill ${onTrack?'ok':'bad'}">${onTrack?'On track':'Behind'}</span> &nbsp;target ~${expected}%</div>
+     <div class="pbar"><i style="width:${avg}%"></i></div></div>
+   <div class="card"><div class="k">Hours logged</div>
+     <div class="v">${fmtH(log)}<small> / ${fmtH(est)}h</small></div>
+     <div class="meta">${hPct}% of estimate · ${fmtH(Math.max(0,est-log))}h remaining</div>
+     <div class="pbar"><i style="width:${hPct}%"></i></div></div>
+   <div class="card"><div class="k">By owner</div>
+     <div class="owners" style="margin-top:8px">
+       ${dStats.map(s=>`<div class="orow"><div class="nm"><span class="d" style="background:${COLOR[s.o]}"></span>${s.o==="Both"?"Shared":s.o}</div>
+         <div class="ob"><i style="width:${s.p}%;background:${COLOR[s.o]}"></i></div><div class="pc">${s.p}%</div></div>`).join("")}
+     </div></div>`;
+}
+
+/* ====================== RENDER: CHIPS ====================== */
+function renderChips(){
+  const counts={All:tasks.length, Deo:0, Cannon:0, Both:0};
+  tasks.forEach(t=>counts[t.owner]!=null&&counts[t.owner]++);
+  const defs=[["All","All",null],["Deo","Deo",COLOR.Deo],["Cannon","Cannon",COLOR.Cannon],["Both","Shared",COLOR.Both]];
+  $("#ownerChips").innerHTML = defs.map(([k,lab,col])=>`
+    <button class="chip ${filterOwner===k?'active':''}" data-o="${k}" ${filterOwner===k?'style="background:var(--primary)"':''}>
+      ${col?`<span class="d" style="background:${col}"></span>`:""}${lab} <span style="opacity:.6">${counts[k]}</span></button>`).join("");
+  document.querySelectorAll("#ownerChips .chip").forEach(c=>c.onclick=()=>{filterOwner=c.dataset.o; renderChips(); renderGrid();});
+}
+
+/* ====================== RENDER: GANTT ====================== */
+function visibleTasks(){
+  return tasks.filter(t=>(filterOwner==="All"||t.owner===filterOwner) &&
+    (!filterText || (t.name+" "+t.section).toLowerCase().includes(filterText)));
+}
+function sectionsOf(list){
+  const seen=[]; list.forEach(t=>{if(!seen.includes(t.section))seen.push(t.section);}); return seen;
+}
+function renderGrid(){
+  const grid=$("#grid"), n=NW();
+  grid.style.gridTemplateColumns="264px repeat("+n+",1fr)";
+  let h='<div class="gh namecell">Task</div>';
+  cfg.weeks.forEach((w,i)=>{h+=`<div class="gh cell wk ${i===cfg.now_week?'isnow':''}"><div class="l">${esc(w.label)}</div><div class="r mono">${esc(w.range)}</div></div>`;});
+  const list=visibleTasks();
+  const secs=sectionsOf(list);
+  secs.forEach(sec=>{
+    const items=list.filter(t=>t.section===sec);
+    const sp=items.length?Math.round(items.reduce((s,t)=>s+t.comp,0)/items.length):0;
+    h+=`<div class="sec"><span>${esc(sec)}</span><span class="cnt mono">${items.length}</span><div class="secbar"><i style="width:${sp}%"></i></div><span class="cnt mono">${sp}%</span></div>`;
+    items.forEach(t=>{
+      h+=`<div class="namecell"><span class="d" style="background:${COLOR[t.owner]}"></span><span class="nm" title="${esc(t.name)}">${esc(t.name)}</span>
+        <span class="acts"><button class="mini" data-edit="${t.id}">✎</button><button class="mini del" data-del="${t.id}">×</button></span></div>`;
+      const left=t.w0/n*100, width=(t.w1-t.w0+1)/n*100;
+      h+=`<div class="track"><div class="bar ${t.comp>=100?'done':''}" data-edit="${t.id}" data-tip="${t.id}"
+        style="left:${left}%;width:calc(${width}% - 7px);background:${COLOR[t.owner]}">
+        <span class="fill" style="width:${t.comp}%"></span><span class="stripe"></span>
+        <span class="lbl">${esc(t.name)} · ${t.comp}%</span></div></div>`;
+    });
+  });
+  if(!list.length) h+=`<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--mut)">No tasks match your filter.</div>`;
+  grid.innerHTML=h;
+  $(".gwrap").classList.toggle("editing",editMode);
+  // bind
+  grid.querySelectorAll("[data-edit]").forEach(el=>el.onclick=e=>{ if(editMode||el.classList.contains("mini")){e.stopPropagation();openTask(el.dataset.edit);} });
+  grid.querySelectorAll("[data-del]").forEach(el=>el.onclick=e=>{e.stopPropagation();delTask(el.dataset.del);});
+  grid.querySelectorAll(".bar[data-tip]").forEach(el=>{
+    el.addEventListener("mousemove",ev=>showBarTip(el.dataset.tip,ev));
+    el.addEventListener("mouseleave",hideTip);
+  });
+  placeOverlay();
+}
+function placeOverlay(){
+  const grid=$("#grid"), gw=$(".gwrap"); const r=grid.getBoundingClientRect();
+  const n=NW(); const colW=(r.width-264)/n;
+  const nc=$("#nowcol"); nc.style.left=(264+cfg.now_week*colW)+"px"; nc.style.width=colW+"px";
+  const hov=$("#hov"); hov.style.left="264px"; hov.style.right="0"; hov.style.pointerEvents=editMode?"none":"auto"; hov.innerHTML="";
+  for(let i=0;i<n;i++){const s=document.createElement("div");s.className="hstrip";s.style.left=(i*colW)+"px";s.style.width=colW+"px";
+    s.addEventListener("mousemove",e=>showWeekTip(i,e));s.addEventListener("mouseleave",hideTip);hov.appendChild(s);}
+}
+
+/* ====================== TOOLTIPS ====================== */
+const tip=$("#tip");
+function posTip(e){const pad=14;let x=e.clientX+16,y=e.clientY+16;const tw=tip.offsetWidth,th=tip.offsetHeight;
+  if(x+tw+pad>innerWidth)x=e.clientX-tw-16; if(y+th+pad>innerHeight)y=innerHeight-th-pad; if(y<pad)y=pad; tip.style.left=x+"px";tip.style.top=y+"px";}
+function tasksFor(w,o){return tasks.filter(t=>t.owner===o&&t.w0<=w&&t.w1>=w);}
+function listHtml(a){return a.length?'<ul>'+a.map(t=>`<li>${esc(t.name)} <b>${t.comp}% · ${fmtH(t.logged_hours)}/${fmtH(t.est_hours)}h</b></li>`).join('')+'</ul>':'<div class="none">— nothing scheduled —</div>';}
+function showWeekTip(w,e){const wk=cfg.weeks[w];if(!wk)return;
+  tip.innerHTML=`<h4>${esc(wk.label)} <span class="mono">${esc(wk.range)}</span></h4>`+
+   ["Deo","Cannon","Both"].map(o=>`<div class="grp"><div class="who"><span class="d" style="background:${COLOR[o]}"></span>${OWNERS[o]}</div>${listHtml(tasksFor(w,o))}</div>`).join("");
+  tip.style.opacity="1";posTip(e);}
+function showBarTip(id,e){const t=tasks.find(x=>x.id===id);if(!t)return;const w0=cfg.weeks[t.w0],w1=cfg.weeks[t.w1];
+  tip.innerHTML=`<h4>${esc(t.name)} <span class="d" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${COLOR[t.owner]}"></span></h4>
+   <div style="color:var(--mut);font-size:11.5px">${OWNERS[t.owner]} · ${esc(t.section)}</div>
+   <div class="grp" style="display:flex;gap:14px;margin-top:9px">
+     <div><div style="color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Weeks</div><div class="mono" style="font-weight:700">${esc(w0?w0.label:'')}→${esc(w1?w1.label:'')}</div></div>
+     <div><div style="color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Done</div><div class="mono" style="font-weight:700">${t.comp}%</div></div>
+     <div><div style="color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Hours</div><div class="mono" style="font-weight:700">${fmtH(t.logged_hours)} / ${fmtH(t.est_hours)}</div></div>
+   </div>`;
+  tip.style.opacity="1";posTip(e);}
+function hideTip(){tip.style.opacity="0";}
+
+/* ====================== RENDER ALL ====================== */
+function renderAll(){ renderDash(); renderChips(); renderGrid(); fillWeekSelects(); fillSecList(); renderBudget(); }
+
+/* ====================== TASK MODAL ====================== */
+function fillWeekSelects(){
+  const opt=cfg.weeks.map((w,i)=>`<option value="${i}">${esc(w.label)} · ${esc(w.range)}</option>`).join("");
+  $("#f_w0").innerHTML=opt; $("#f_w1").innerHTML=opt;
+  $("#s_now").innerHTML=cfg.weeks.map((w,i)=>`<option value="${i}">${esc(w.label)} · ${esc(w.range)}</option>`).join("");
+}
+function fillSecList(){ $("#secList").innerHTML=sectionsOf(tasks).map(s=>`<option value="${esc(s)}">`).join(""); }
+let chosenOwner="Deo";
+function setOwnerSeg(o){chosenOwner=o;document.querySelectorAll("#f_owner button").forEach(b=>{const on=b.dataset.o===o;b.classList.toggle("sel",on);b.style.background=on?COLOR[o]:"";});}
+document.querySelectorAll("#f_owner button").forEach(b=>b.onclick=()=>setOwnerSeg(b.dataset.o));
+$("#f_comp").addEventListener("input",e=>$("#f_compVal").textContent=e.target.value+"%");
+
+function openTask(id){
+  modalOpen=true; editingId=id; $("#tmErr").textContent="";
+  const t = id? tasks.find(x=>x.id===id) : null;
+  $("#tmTitle").textContent = t?"Edit task":"Add task";
+  $("#tmDel").style.display = t?"":"none";
+  $("#f_name").value=t?t.name:""; $("#f_section").value=t?t.section:(sectionsOf(tasks)[0]||"General");
+  setOwnerSeg(t?t.owner:"Deo");
+  $("#f_w0").value=t?t.w0:cfg.now_week; $("#f_w1").value=t?t.w1:cfg.now_week;
+  $("#f_comp").value=t?t.comp:0; $("#f_compVal").textContent=(t?t.comp:0)+"%";
+  $("#f_est").value=t?t.est_hours:""; $("#f_log").value=t?t.logged_hours:"";
+  $("#taskModal").classList.add("show");
+}
+function closeTask(){modalOpen=false;editingId=null;$("#taskModal").classList.remove("show");}
+$("#tmCancel").onclick=closeTask;
+$("#taskModal").addEventListener("click",e=>{if(e.target.id==="taskModal")closeTask();});
+
+$("#tmSave").onclick=async()=>{
+  let w0=+$("#f_w0").value,w1=+$("#f_w1").value; if(w1<w0){[w0,w1]=[w1,w0];}
+  const name=$("#f_name").value.trim();
+  if(!name){$("#tmErr").textContent="Task name is required.";return;}
+  const t=tasks.find(x=>x.id===editingId);
+  const rec={ id: editingId||"", section:($("#f_section").value||"General").trim(), name, owner:chosenOwner,
+    comp:+$("#f_comp").value, w0, w1, est_hours:+$("#f_est").value||0, logged_hours:+$("#f_log").value||0,
+    sort_order: t? t.sort_order : (Math.max(0,...tasks.map(x=>x.sort_order))+1) };
+  const btn=$("#tmSave");btn.disabled=true;btn.textContent="Saving…";setSync("saving");
+  try{ const saved=await apiSave(rec); upsertLocal(saved); closeTask(); renderAll(); toast(editingId?"Task updated":"Task added"); setSync("live");
+  }catch(e){ $("#tmErr").textContent=err(e); setSync("off"); }
+  finally{btn.disabled=false;btn.textContent="Save task";}
+};
+$("#tmDel").onclick=()=>delTask(editingId,true);
+
+async function delTask(id,fromModal){
+  const t=tasks.find(x=>x.id===id); if(!t)return;
+  if(!confirm(`Delete "${t.name}"?`))return;
+  setSync("saving");
+  try{ await apiDelete(id); tasks=tasks.filter(x=>x.id!==id); if(fromModal)closeTask(); renderAll(); toast("Task deleted"); setSync("live");
+  }catch(e){ alert(err(e)); setSync("off"); }
+}
+function upsertLocal(saved){ const i=tasks.findIndex(x=>x.id===saved.id);
+  saved={...saved,comp:+saved.comp,w0:+saved.w0,w1:+saved.w1,est_hours:+saved.est_hours,logged_hours:+saved.logged_hours,sort_order:+saved.sort_order};
+  if(i>=0)tasks[i]=saved; else tasks.push(saved); }
+
+/* ====================== SETTINGS ====================== */
+$("#settingsBtn").onclick=()=>{ modalOpen=true; $("#sErr").textContent=""; $("#s_old").value="";$("#s_new").value="";
+  $("#s_title").value=cfg.title; $("#s_sub").value=cfg.subtitle; $("#s_now").value=cfg.now_week; $("#setModal").classList.add("show"); };
+function closeSet(){modalOpen=false;$("#setModal").classList.remove("show");}
+$("#sCancel").onclick=closeSet;
+$("#setModal").addEventListener("click",e=>{if(e.target.id==="setModal")closeSet();});
+$("#sSave").onclick=async()=>{
+  const btn=$("#sSave");btn.disabled=true;setSync("saving");
+  try{ await apiSetMeta($("#s_title").value.trim(),$("#s_sub").value.trim()); await apiSetNow(+$("#s_now").value);
+    cfg.title=$("#s_title").value.trim()||cfg.title; cfg.subtitle=$("#s_sub").value.trim(); cfg.now_week=+$("#s_now").value;
+    apply({config:cfg,tasks}); closeSet(); toast("Settings saved"); setSync("live");
+  }catch(e){alert(err(e));setSync("off");}finally{btn.disabled=false;}
+};
+$("#sPass").onclick=async()=>{
+  const o=$("#s_old").value,nw=$("#s_new").value; $("#sErr").textContent="";
+  if(nw.length<4){$("#sErr").textContent="New passcode must be at least 4 characters.";return;}
+  const btn=$("#sPass");btn.disabled=true;btn.textContent="Updating…";
+  try{ await apiSetPass(o,nw); PASS=nw; sessionStorage.setItem("eh_pass",nw); $("#s_old").value="";$("#s_new").value="";
+    toast("Passcode updated"); $("#sErr").style.color="var(--ok)"; $("#sErr").textContent="Done — new passcode active.";
+  }catch(e){ $("#sErr").style.color="var(--bad)"; $("#sErr").textContent=(e.code==="28000")?"Current passcode is wrong.":err(e); }
+  finally{btn.disabled=false;btn.textContent="Update passcode";}
+};
+
+/* ====================== TOOLBAR ====================== */
+$("#editBtn").onclick=()=>{editMode=!editMode;const b=$("#editBtn");b.classList.toggle("on",editMode);
+  b.innerHTML=editMode?'<svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Done':'<svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit';
+  renderGrid(); renderBudget();};
+$("#addBtn").onclick=()=>openTask(null);
+$("#logoutBtn").onclick=()=>{
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  PASS=""; sessionStorage.removeItem("eh_pass");
+  editMode=false; modalOpen=false;
+  $("#taskModal").classList.remove("show"); $("#setModal").classList.remove("show");
+  $("#app").style.display="none"; $("#gate").style.display="flex";
+  $("#gatepass").value=""; $("#gateerr").textContent=""; $("#gatepass").focus();
+};
+$("#search").addEventListener("input",e=>{filterText=e.target.value.toLowerCase().trim();renderGrid();});
+
+/* ====================== THEME ====================== */
+function setTheme(t){document.documentElement.setAttribute("data-theme",t);localStorage.setItem("eh_theme",t);
+  $("#themeBtn").innerHTML = t==="dark"
+    ? '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Light'
+    : '<svg viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Dark';
+  if(typeof placeOverlay==="function"&&$("#grid").children.length)placeOverlay();}
+$("#themeBtn").onclick=()=>setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+setTheme(localStorage.getItem("eh_theme")||"dark");
+
+/* ====================== UTIL ====================== */
+function err(e){ if(e&&(e.code==="28000"||/unauthorized/i.test(e.message||"")))return "Session expired — refresh and re-enter passcode."; return (e&&e.message)||"Something went wrong."; }
+let toastT; function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove("show"),2000);}
+window.addEventListener("resize",()=>{if($("#grid").children.length)placeOverlay();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if($("#taskModal").classList.contains("show"))closeTask();if($("#setModal").classList.contains("show"))closeSet();}});
+
+/* ====================== TABS ====================== */
+function setView(v){ curView=v;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view===v));
+  $("#viewTimeline").style.display = v==="timeline"?"":"none";
+  $("#viewBudget").style.display = v==="budget"?"":"none";
+  $("#addBtn").style.display = v==="timeline"?"":"none";
+  if(v==="timeline" && $("#grid").children.length) placeOverlay();
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>setView(t.dataset.view));
+
+/* ====================== BUDGET ====================== */
+const num=x=>+x||0;
+const money=n=>"$"+(Math.round(num(n)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+function calcBudget(){
+  const b=budget, L=b.labor||[], C=b.contract||[], M=b.material||[], R=b.rental||[];
+  const DLa=L.reduce((s,r)=>s+num(r.rate)*num(r.hrsA),0), DLe=L.reduce((s,r)=>s+num(r.rate)*num(r.hrsE),0);
+  const loh=num(b.laborOhRate), TDLa=DLa*(1+loh), TDLe=DLe*(1+loh);
+  const TCLa=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsA),0), TCLe=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsE),0);
+  const TDMa=M.reduce((s,r)=>s+num(r.a),0), TDMe=M.reduce((s,r)=>s+num(r.e),0);
+  const ETRMa=R.reduce((s,r)=>s+num(r.value)*num(r.rate),0), ETRMe=ETRMa;
+  const subA=TDLa+TCLa+TDMa+ETRMa, subE=TDLe+TCLe+TDMe+ETRMe, boh=num(b.bizOhRate);
+  const bizA=subA*boh, bizE=subE*boh;
+  return {DLa,DLe,TDLa,TDLe,TCLa,TCLe,TDMa,TDMe,ETRMa,ETRMe,subA,subE,bizA,bizE,totalA:subA+bizA,totalE:subE+bizE,loh,boh};
+}
+function timePct(){ const s=new Date(budget.start),t=new Date(budget.today),e=new Date(budget.end);
+  if(isNaN(s)||isNaN(e)||e<=s) return 0; return Math.max(0,Math.min(100,(t-s)/(e-s)*100)); }
+function fmtDate(d){ const x=new Date(d); return isNaN(x)?"—":x.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
+
+function inp(sec,idx,field,val,cls){ return `<input class="bin ${cls||''}" data-sec="${sec}" data-idx="${idx}" data-field="${field}" value="${esc(val)}">`; }
+function numCell(sec,idx,field,val,cls){ return editMode? inp(sec,idx,field,val,cls) : `<span class="${cls||''}">${esc(val)}</span>`; }
+
+function renderBudget(){
+  if(!budget||!budget.labor){ budget=defaultBudget(); }
+  const c=calcBudget(), pct=timePct();
+  const spent= c.totalE? Math.min(100,Math.round(c.totalA/c.totalE*100)):0;
+  const e=editMode;
+
+  // ---- dashboard cards ----
+  let h=`<div class="bdash">
+    <div class="card tcard"><div class="k">Project timeline</div>
+      <div class="tline"><i style="width:${pct}%"></i><span class="now" style="left:${pct}%"></span></div>
+      <div class="tdates">
+        <div><span>Start</span><b>${fmtDate(budget.start)}</b></div>
+        <div class="mid"><span>Today · ${Math.round(pct)}% elapsed</span><b>${fmtDate(budget.today)}</b></div>
+        <div class="end"><span>End</span><b>${fmtDate(budget.end)}</b></div>
+      </div></div>
+    <div class="card bhero act"><div class="k">Actual to date</div><div class="v">${money(c.totalA)}</div>
+      <div class="bcmp">Direct + contract + materials + overhead, spent so far</div></div>
+    <div class="card bhero est"><div class="k">Total estimate</div><div class="v">${money(c.totalE)}</div>
+      <div class="bcmp">${spent}% of estimated budget used · ${money(Math.max(0,c.totalE-c.totalA))} remaining</div>
+      <div class="pbar"><i style="width:${spent}%"></i></div></div>
+  </div>`;
+
+  if(e) h+=`<div class="editpanel">
+     <span style="font-weight:700;color:var(--txt2)">Dates:</span>
+     <span class="ip">Start ${inp("root",-1,"start",budget.start)}</span>
+     <span class="ip">Today ${inp("root",-1,"today",budget.today)}</span>
+     <span class="ip">End ${inp("root",-1,"end",budget.end)}</span>
+   </div>`;
+
+  // ---- column header helper ----
+  const head=(cat)=>`<div class="bth"><div class="cat">${cat}</div><div class="col act">Actual</div><div class="col">Estimate</div></div>`;
+
+  // ---- Direct Labor ----
+  h+=`<div class="btable">${head("Direct Labor")}`;
+  (budget.labor||[]).forEach((r,i)=>{
+    const a=num(r.rate)*num(r.hrsA), es=num(r.rate)*num(r.hrsE);
+    h+=`<div class="brow"><div class="nm">${e?inp("labor",i,"name",r.name,"nm"):esc(r.name)}
+        <span class="sub">${e?`$${inp("labor",i,"rate",r.rate)}/hr`:`$${num(r.rate)}/hr`}</span></div>
+      <div class="val act">${e?`${inp("labor",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`:`${money(a)}<div class="sub">${num(r.hrsA)} hrs</div>`}</div>
+      <div class="val">${e?`${inp("labor",i,"hrsE",r.hrsE)} <small>hrs · ${money(es)}</small>${e?`<button class="bdel" data-del="labor" data-idx="${i}">×</button>`:""}`:`${money(es)}<div class="sub">${num(r.hrsE)} hrs</div>`}</div></div>`;
+  });
+  if(e) h+=`<div class="baddrow"><button class="badd" data-add="labor">+ Add labor line</button></div>`;
+  h+=`<div class="brow oh"><div class="nm">Labor overhead</div>
+      <div class="val act">${e?`${inp("root",-1,"laborOhRate",Math.round(c.loh*1000)/10)}<small>%</small>`:Math.round(c.loh*100)+"%"} · ${money(c.TDLa-c.DLa)}</div>
+      <div class="val">${Math.round(c.loh*100)}% · ${money(c.TDLe-c.DLe)}</div></div>
+    <div class="brow tot"><div class="nm">Total Direct Labor (TDL)</div><div class="val act">${money(c.TDLa)}</div><div class="val">${money(c.TDLe)}</div></div></div>`;
+
+  // ---- Contract Labor ----
+  h+=`<div class="btable">${head("Contract Labor")}`;
+  (budget.contract||[]).forEach((r,i)=>{
+    const a=num(r.rate)*num(r.hrsA), es=num(r.rate)*num(r.hrsE);
+    h+=`<div class="brow"><div class="nm">${e?inp("contract",i,"name",r.name,"nm"):esc(r.name)}
+        <span class="sub">${e?`$${inp("contract",i,"rate",r.rate)}/hr`:`$${num(r.rate)}/hr`}</span></div>
+      <div class="val act">${e?`${inp("contract",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`:`${money(a)}<div class="sub">${num(r.hrsA)} hrs</div>`}</div>
+      <div class="val">${e?`${inp("contract",i,"hrsE",r.hrsE)} <small>hrs · ${money(es)}</small><button class="bdel" data-del="contract" data-idx="${i}">×</button>`:`${money(es)}<div class="sub">${num(r.hrsE)} hrs</div>`}</div></div>`;
+  });
+  if(e) h+=`<div class="baddrow"><button class="badd" data-add="contract">+ Add contract line</button></div>`;
+  h+=`<div class="brow tot"><div class="nm">Total Contract Labor (TCL)</div><div class="val act">${money(c.TCLa)}</div><div class="val">${money(c.TCLe)}</div></div></div>`;
+
+  // ---- Direct Materials ----
+  h+=`<div class="btable">${head("Direct Material Costs")}`;
+  (budget.material||[]).forEach((r,i)=>{
+    h+=`<div class="brow"><div class="nm">${e?inp("material",i,"name",r.name,"nm"):esc(r.name)}</div>
+      <div class="val act">${e?inp("material",i,"a",r.a):money(r.a)}</div>
+      <div class="val">${e?`${inp("material",i,"e",r.e)}<button class="bdel" data-del="material" data-idx="${i}">×</button>`:money(r.e)}</div></div>`;
+  });
+  if(e) h+=`<div class="baddrow"><button class="badd" data-add="material">+ Add material line</button></div>`;
+  h+=`<div class="brow tot"><div class="nm">Total Direct Material (TDM)</div><div class="val act">${money(c.TDMa)}</div><div class="val">${money(c.TDMe)}</div></div></div>`;
+
+  // ---- Equipment Rental ----
+  h+=`<div class="btable"><div class="bth"><div class="cat">Equipment Rental</div><div class="col act">Value × Rate</div><div class="col">Cost</div></div>`;
+  (budget.rental||[]).forEach((r,i)=>{
+    h+=`<div class="brow"><div class="nm">${e?inp("rental",i,"name",r.name,"nm"):esc(r.name||"—")}</div>
+      <div class="val act">${e?`${inp("rental",i,"value",r.value)} × ${inp("rental",i,"rate",r.rate)}`:`${money(r.value)} × ${num(r.rate)}`}</div>
+      <div class="val">${money(num(r.value)*num(r.rate))}${e?`<button class="bdel" data-del="rental" data-idx="${i}">×</button>`:""}</div></div>`;
+  });
+  if(e) h+=`<div class="baddrow"><button class="badd" data-add="rental">+ Add rental line</button></div>`;
+  if(!(budget.rental||[]).length && !e) h+=`<div class="brow"><div class="nm sub">No equipment rental</div><div class="val act">$0.00</div><div class="val">$0.00</div></div>`;
+  h+=`<div class="brow tot"><div class="nm">Estimated Total Rental (ETRM)</div><div class="val act">${money(c.ETRMa)}</div><div class="val">${money(c.ETRMe)}</div></div></div>`;
+
+  // ---- Totals ----
+  h+=`<div class="btable">${head("Project Total")}
+    <div class="brow tot"><div class="nm">TDL + TCL + TDM + ETRM</div><div class="val act">${money(c.subA)}</div><div class="val">${money(c.subE)}</div></div>
+    <div class="brow oh"><div class="nm">Business overhead</div>
+      <div class="val act">${e?`${inp("root",-1,"bizOhRate",Math.round(c.boh*1000)/10)}<small>%</small>`:Math.round(c.boh*100)+"%"} · ${money(c.bizA)}</div>
+      <div class="val">${Math.round(c.boh*100)}% · ${money(c.bizE)}</div></div>
+    <div class="brow grand"><div class="nm">Total Cost</div><div class="val act">${money(c.totalA)}</div><div class="val">${money(c.totalE)}</div></div>
+  </div>`;
+
+  h+=`<div class="bnote">All figures <b>auto-calculate</b> from the line items above — overhead is applied on top of each subtotal. Turn on <b>Edit</b> (top right) to change rates, hours, costs, dates, or overhead %, or to add and remove lines. Changes save to the shared budget for everyone.</div>`;
+
+  $("#viewBudget").innerHTML=h;
+}
+
+/* ---- budget edit wiring (event delegation) ---- */
+$("#viewBudget").addEventListener("change",ev=>{
+  const el=ev.target; if(!el.classList||!el.classList.contains("bin")) return;
+  const sec=el.dataset.sec, idx=+el.dataset.idx, field=el.dataset.field; let v=el.value;
+  const dateFields=["start","today","end"];
+  if(field==="laborOhRate"||field==="bizOhRate"){ v=num(v)/100; }
+  else if(field==="name"||dateFields.includes(field)){ /* keep string */ }
+  else { v=num(v); }
+  if(sec==="root"){ budget[field]=v; } else { if(!budget[sec])budget[sec]=[]; budget[sec][idx][field]=v; }
+  saveBudget(); renderBudget();
+});
+$("#viewBudget").addEventListener("click",ev=>{
+  const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]");
+  if(add){ const s=add.dataset.add; if(!budget[s])budget[s]=[];
+    const def={labor:{name:"New role",rate:12,hrsA:0,hrsE:0},contract:{name:"New contractor",rate:0,hrsA:0,hrsE:0},
+      material:{name:"New item",a:0,e:0},rental:{name:"New equipment",value:0,rate:0}}[s];
+    budget[s].push({...def}); saveBudget(); renderBudget(); }
+  if(del){ const s=del.dataset.del, i=+del.dataset.idx; budget[s].splice(i,1); saveBudget(); renderBudget(); }
+});
+let budgetSaveT;
+function saveBudget(){ setSync("saving"); clearTimeout(budgetSaveT); budgetSaveT=setTimeout(async()=>{
+  try{ await apiSetBudget(budget); cfg.budget=budget; setSync("live"); toast("Budget saved"); }
+  catch(err2){ setSync("off"); }
+},600); }
+
+/* ====================== LOGIN BACKGROUND (Background Paths) ====================== */
+function buildBgPaths(){
+  const el=document.getElementById("bgpaths"); if(!el) return;
+  let p="";
+  for(const pos of [1,-1]){
+    for(let i=0;i<36;i++){
+      const d=`M-${380-i*5*pos} -${189+i*6}C-${380-i*5*pos} -${189+i*6} -${312-i*5*pos} ${216-i*6} ${152-i*5*pos} ${343-i*6}C${616-i*5*pos} ${470-i*6} ${684-i*5*pos} ${875-i*6} ${684-i*5*pos} ${875-i*6}`;
+      const op=(0.10+i*0.025).toFixed(3), w=(0.6+i*0.035).toFixed(2);
+      const delay=((i*0.42)%9).toFixed(2), dur=7+(i%6);
+      p+=`<path d="${d}" stroke="rgba(15,23,42,${op})" stroke-width="${w}" fill="none" style="animation-delay:${delay}s;animation-duration:${dur}s"/>`;
+    }
+  }
+  el.innerHTML=`<svg viewBox="0 0 696 316" fill="none" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">${p}</svg>`;
+}
+
+/* ====================== BOOT ====================== */
+buildBgPaths();
+if(PASS){ tryUnlock(PASS); } else { $("#gatepass").focus(); }
+</script>
+</body>
+</html>
