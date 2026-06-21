@@ -386,6 +386,15 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .exmenu button:hover{background:var(--panel2); color:var(--txt)}
 .bresync{border:1px solid var(--line-strong); background:var(--input-bg); color:var(--mut); border-radius:6px; width:24px; height:24px; font-size:13px; margin-left:4px; vertical-align:middle}
 .bresync:hover{color:var(--deo); border-color:var(--deo)}
+.abadge{display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.03em; padding:1px 7px; border-radius:999px; vertical-align:middle; margin-left:4px}
+.abadge.susp{background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad)}
+.abadge.lim{background:color-mix(in srgb,var(--both) 18%,transparent); color:var(--both)}
+.agroup.suspended{border-color:color-mix(in srgb,var(--bad) 45%,var(--line)); opacity:.85}
+.aacts .amanage{background:var(--primary); color:var(--primary-fg); border:1px solid var(--primary)}
+.aacts .amanage:hover{opacity:.9; background:var(--primary)}
+.blimit{font-size:11.5px; margin-top:9px; padding:7px 11px; border-radius:9px; border:1px solid var(--line)}
+.blimit.ok{background:color-mix(in srgb,var(--ok) 10%,transparent); color:var(--ok)}
+.blimit.over{background:color-mix(in srgb,var(--bad) 12%,transparent); color:var(--bad); font-weight:600}
 </style>
 </head>
 <body>
@@ -464,6 +473,29 @@ button{font-family:var(--font); cursor:pointer; border:0}
   </div>
   <div id="adminGrid"></div>
 </div>
+
+<!-- ============ ADMIN MANAGE MODAL ============ -->
+<div class="modal" id="adminModal"><div class="sheet">
+  <h3 id="amTitle">Manage group</h3>
+  <p class="hint" id="amSub"></p>
+  <div id="amStatus"></div>
+  <div class="divider"></div>
+  <h3 style="font-size:15px">Members</h3>
+  <div id="am_members"></div>
+  <div class="memrow" style="margin-top:8px"><input id="am_newmem" class="bin nm" placeholder="Add a member…"><button class="btn-ghost" id="am_addmem" type="button" style="flex:none;padding:8px 14px">Add</button></div>
+  <div class="divider"></div>
+  <h3 style="font-size:15px">Budget limit</h3>
+  <p class="hint">Cap the group's total estimated budget. Leave blank for no limit.</p>
+  <div class="memrow"><input id="am_limit" class="bin" type="number" min="0" step="100" placeholder="e.g. 10000"><button class="btn-ghost" id="am_setlimit" type="button" style="flex:none;padding:8px 14px">Set</button><button class="btn-ghost" id="am_clearlimit" type="button" style="flex:none;padding:8px 14px">Clear</button></div>
+  <div class="seterr" id="amErr"></div>
+  <div class="divider"></div>
+  <div class="acts2" style="flex-wrap:wrap;gap:8px">
+    <button class="btn-ghost" id="am_passcode" type="button">↻ Reset passcode</button>
+    <button class="btn-ghost" id="am_suspend" type="button">Suspend</button>
+    <button class="btn-del" id="am_delete" type="button" style="margin-left:auto">Delete group</button>
+  </div>
+  <div class="acts2"><button class="btn-ghost" id="am_close" type="button">Close</button></div>
+</div></div>
 
 <!-- ============ APP ============ -->
 <div class="wrap" id="app" style="display:none">
@@ -639,6 +671,11 @@ async function apiAddMember(n){ return rpc("add_member",{p:PASS,member_name:n});
 async function apiRemoveMember(n){ return rpc("remove_member",{p:PASS,member_name:n}); }
 async function apiAdminOpen(p,gid){ return rpc("admin_open_group",{admin_p:p,gid}); }
 async function apiAdminReset(p,gid){ return rpc("admin_reset_passcode",{admin_p:p,gid}); }
+async function apiAdminAddMember(p,gid,name){ return rpc("admin_add_member",{admin_p:p,gid,member_name:name}); }
+async function apiAdminRemoveMember(p,gid,name){ return rpc("admin_remove_member",{admin_p:p,gid,member_name:name}); }
+async function apiAdminDeleteGroup(p,gid){ return rpc("admin_delete_group",{admin_p:p,gid}); }
+async function apiAdminSuspend(p,gid,susp){ return rpc("admin_suspend_group",{admin_p:p,gid,susp}); }
+async function apiAdminSetLimit(p,gid,lim){ return rpc("admin_set_budget_limit",{admin_p:p,gid,lim}); }
 
 /* ====================== GATE ====================== */
 async function tryUnlock(p){
@@ -650,7 +687,9 @@ async function tryUnlock(p){
     else { isAdminMode=false; apply(d); $("#app").style.display=""; startPolling(); }
   }catch(e){
     PASS=""; sessionStorage.removeItem("eh_pass");
-    $("#gateerr").textContent = (e.code==="28000"||/unauthorized/i.test(e.message||"")) ? "Incorrect passcode." : "Connection error — try again.";
+    $("#gateerr").textContent = /suspend/i.test(e.message||"") ? e.message
+      : (e.code==="28000"||/unauthorized/i.test(e.message||"")) ? "Incorrect passcode."
+      : "Connection error — try again.";
     $("#gatepass").select();
   }finally{ btn.disabled=false; btn.textContent="Sign In"; }
 }
@@ -728,18 +767,47 @@ function enterAdmin(groups){
 }
 function renderAdmin(groups){
   $("#adminSub").textContent = `${groups.length} group${groups.length===1?'':'s'} across all project labs`;
+  adminGroups = groups;
   $("#adminGrid").innerHTML = groups.length ? groups.map(g=>`
-    <div class="agroup">
-      <div class="cls">${esc(g.class_name||'')}</div>
+    <div class="agroup${g.suspended?' suspended':''}">
+      <div class="cls">${esc(g.class_name||'')} ${g.suspended?'<span class="abadge susp">Suspended</span>':''}${g.budget_limit?'<span class="abadge lim">Cap $'+Number(g.budget_limit).toLocaleString()+'</span>':''}</div>
       <div class="proj">${esc(g.project_name||'Untitled project')}</div>
       <div class="meta">${esc(g.semester||'')}${g.section?' · §'+esc(g.section):''}${g.group_label?' · '+esc(g.group_label):''}</div>
       <div class="pbar"><i style="width:${g.progress||0}%"></i></div>
       <div class="arow"><span>${g.progress||0}% · ${g.task_count||0} tasks</span><span>${(g.members||[]).length} member${(g.members||[]).length===1?'':'s'}</span></div>
-      <div class="aacts"><button data-open="${g.id}">View</button><button class="areset" data-reset="${g.id}" data-name="${esc(g.project_name||g.class_name||'')}">Reset passcode</button></div>
+      <div class="aacts"><button data-open="${g.id}">View</button><button class="amanage" data-manage="${g.id}">Manage</button></div>
     </div>`).join("") : `<div style="color:var(--mut);padding:30px">No groups have registered yet.</div>`;
   $("#adminGrid").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>adminOpen(b.dataset.open));
-  $("#adminGrid").querySelectorAll("[data-reset]").forEach(b=>b.onclick=()=>adminReset(b.dataset.reset,b.dataset.name));
+  $("#adminGrid").querySelectorAll("[data-manage]").forEach(b=>b.onclick=()=>adminManage(b.dataset.manage));
 }
+let adminGroups=[], amGid=null;
+function adminManage(gid){
+  const g=adminGroups.find(x=>x.id===gid); if(!g) return;
+  amGid=gid; modalOpen=true; $("#amErr").textContent="";
+  $("#amTitle").textContent=g.project_name||g.class_name||"Group";
+  $("#amSub").textContent=`${g.class_name||''} · ${g.semester||''}${g.section?' · §'+g.section:''}${g.group_label?' · '+g.group_label:''}`;
+  $("#amStatus").innerHTML = g.suspended ? `<div class="abanner" style="margin:0">⛔ This group is suspended — members cannot sign in.</div>` : "";
+  $("#am_limit").value = g.budget_limit||"";
+  $("#am_suspend").textContent = g.suspended ? "Un-suspend" : "Suspend";
+  renderAmMembers(g.members||[]);
+  $("#adminModal").classList.add("show");
+}
+function renderAmMembers(mems){
+  $("#am_members").innerHTML = mems.length ? mems.map(n=>`<div class="memrow"><input class="bin nm" value="${esc(n)}" disabled><button class="smdel" type="button" data-amrm="${esc(n)}">×</button></div>`).join("") : `<div class="hint" style="margin:0">No members.</div>`;
+  document.querySelectorAll("#am_members .smdel").forEach(b=>b.onclick=()=>amDo(()=>apiAdminRemoveMember(PASS,amGid,b.dataset.amrm),"Member removed"));
+}
+async function amRefresh(){ try{ const d=await apiLogin(PASS); if(d.admin){ renderAdmin(d.groups); const g=d.groups.find(x=>x.id===amGid); if(g) adminManage(g.id); } }catch(e){} }
+async function amDo(fn, okMsg){ $("#amErr").textContent=""; try{ await fn(); await amRefresh(); if(okMsg) toast(okMsg); }catch(e){ $("#amErr").textContent=err(e); } }
+$("#am_close").onclick=()=>{ modalOpen=false; $("#adminModal").classList.remove("show"); };
+$("#adminModal").addEventListener("click",e=>{ if(e.target.id==="adminModal"){ modalOpen=false; $("#adminModal").classList.remove("show"); }});
+$("#am_addmem").onclick=()=>{ const n=$("#am_newmem").value.trim(); if(!n)return; $("#am_newmem").value=""; amDo(()=>apiAdminAddMember(PASS,amGid,n),"Member added"); };
+$("#am_newmem").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#am_addmem").click();}});
+$("#am_setlimit").onclick=()=>{ const v=$("#am_limit").value; amDo(()=>apiAdminSetLimit(PASS,amGid, v===""?null:Math.max(0,+v)),"Budget limit set"); };
+$("#am_clearlimit").onclick=()=>{ $("#am_limit").value=""; amDo(()=>apiAdminSetLimit(PASS,amGid,null),"Limit cleared"); };
+$("#am_passcode").onclick=async()=>{ try{ const pw=await apiAdminReset(PASS,amGid); const g=adminGroups.find(x=>x.id===amGid)||{}; prompt(`New passcode for "${g.project_name||g.class_name||''}" — give it to the group (old one stops working):`, pw); }catch(e){ $("#amErr").textContent=err(e); } };
+$("#am_suspend").onclick=()=>{ const g=adminGroups.find(x=>x.id===amGid)||{}; amDo(()=>apiAdminSuspend(PASS,amGid,!g.suspended), g.suspended?"Group un-suspended":"Group suspended"); };
+$("#am_delete").onclick=async()=>{ const g=adminGroups.find(x=>x.id===amGid)||{}; if(!confirm(`Permanently delete "${g.project_name||g.class_name||''}" and all its tasks? This cannot be undone.`))return;
+  try{ await apiAdminDeleteGroup(PASS,amGid); modalOpen=false; $("#adminModal").classList.remove("show"); const d=await apiLogin(PASS); if(d.admin) renderAdmin(d.groups); toast("Group deleted"); }catch(e){ $("#amErr").textContent=err(e); } };
 async function adminOpen(gid){
   try{
     const d=await apiAdminOpen(PASS,gid);
@@ -1262,6 +1330,8 @@ function renderBudget(){
       <div class="val">${Math.round(c.boh*100)}% · ${money(c.bizE)}</div></div>
     <div class="brow grand"><div class="nm">Total Cost</div><div class="val act">${money(c.totalA)}</div><div class="val">${money(c.totalE)}</div></div>
   </div>`;
+  if(cfg.budget_limit){ const lim=+cfg.budget_limit, over=c.totalE>lim;
+    h+=`<div class="blimit ${over?'over':'ok'}">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(c.totalE)} of ${money(lim)} cap set by admin${over?` (${money(c.totalE-lim)} over)`:''}.</div>`; }
 
   h+=`<div class="bnote">All figures <b>auto-calculate</b> from the line items above — overhead is applied on top of each subtotal. Turn on <b>Edit</b> (top right) to change rates, hours, costs, dates, or overhead %, or to add and remove lines. Changes save to the shared budget for everyone.</div>`;
 
