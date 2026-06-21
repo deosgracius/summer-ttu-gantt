@@ -818,7 +818,9 @@ function renderDash(){
   const total=tasks.length;
   const done=tasks.filter(t=>t.comp>=100).length;
   const avg= total? Math.round(tasks.reduce((s,t)=>s+t.comp,0)/total):0;
-  const est=tasks.reduce((s,t)=>s+t.est_hours,0);
+  // expected student-hours = weeks × 12 × number of members
+  const nMembers=Math.max(1, memberList().length);
+  const est=NW()*12*nMembers;
   const log=tasks.reduce((s,t)=>s+t.logged_hours,0);
   const hPct= est? Math.min(100,Math.round(log/est*100)):0;
   // expected progress by schedule
@@ -838,7 +840,7 @@ function renderDash(){
      <div class="pbar"><i style="width:${avg}%"></i></div></div>
    <div class="card"><div class="k">Hours logged</div>
      <div class="v">${fmtH(log)}<small> / ${fmtH(est)}h</small></div>
-     <div class="meta">${hPct}% of estimate · ${fmtH(Math.max(0,est-log))}h remaining</div>
+     <div class="meta">${hPct}% of expected · ${NW()}wk × 12h × ${nMembers}</div>
      <div class="pbar"><i style="width:${hPct}%"></i></div></div>
    <div class="card"><div class="k">By owner</div>
      <div class="owners" style="margin-top:8px">
@@ -1139,11 +1141,14 @@ function calcBudget(){
   const loh=num(b.laborOhRate), TDLa=DLa*(1+loh), TDLe=DLe*(1+loh);
   const TCLa=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsA),0), TCLe=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsE),0);
   const TDMa=M.reduce((s,r)=>s+num(r.a),0), TDMe=M.reduce((s,r)=>s+num(r.e),0);
-  const ETRMa=R.reduce((s,r)=>s+num(r.value)*num(r.rate),0), ETRMe=ETRMa;
+  const days=projectDays();
+  // equipment rental = value × (rate% per day) × project days
+  const ETRMa=R.reduce((s,r)=>s+num(r.value)*(num(r.rate)/100)*days,0), ETRMe=ETRMa;
   const subA=TDLa+TCLa+TDMa+ETRMa, subE=TDLe+TCLe+TDMe+ETRMe, boh=num(b.bizOhRate);
   const bizA=subA*boh, bizE=subE*boh;
   return {DLa,DLe,TDLa,TDLe,TCLa,TCLe,TDMa,TDMe,ETRMa,ETRMe,subA,subE,bizA,bizE,totalA:subA+bizA,totalE:subE+bizE,loh,boh};
 }
+function projectDays(){ const s=new Date(budget.start),e=new Date(budget.end); if(isNaN(s)||isNaN(e)||e<s) return 1; return Math.max(1,Math.round((e-s)/86400000)); }
 function timePct(){ const s=new Date(budget.start),t=new Date(budget.today),e=new Date(budget.end);
   if(isNaN(s)||isNaN(e)||e<=s) return 0; return Math.max(0,Math.min(100,(t-s)/(e-s)*100)); }
 function fmtDate(d){ const x=new Date(d); return isNaN(x)?"—":x.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
@@ -1225,16 +1230,19 @@ function renderBudget(){
   if(e) h+=`<div class="baddrow"><button class="badd" data-add="material">+ Add material line</button></div>`;
   h+=`<div class="brow tot"><div class="nm">Total Direct Material (TDM)</div><div class="val act">${money(c.TDMa)}</div><div class="val">${money(c.TDMe)}</div></div></div>`;
 
-  // ---- Equipment Rental ----
-  h+=`<div class="btable"><div class="bth"><div class="cat">Equipment Rental</div><div class="col act">Value × Rate</div><div class="col">Cost</div></div>`;
+  // ---- Equipment Rental (0.2% of value per day × project days) ----
+  const days=projectDays();
+  h+=`<div class="btable"><div class="bth"><div class="cat">Equipment Rental <span style="text-transform:none;letter-spacing:0;color:var(--mut);font-weight:600">· ${days} days</span></div><div class="col act">Purchase value</div><div class="col">Rental cost</div></div>`;
   (budget.rental||[]).forEach((r,i)=>{
-    h+=`<div class="brow"><div class="nm">${e?inp("rental",i,"name",r.name,"nm"):esc(r.name||"—")}</div>
-      <div class="val act">${e?`${inp("rental",i,"value",r.value)} × ${inp("rental",i,"rate",r.rate)}`:`${money(r.value)} × ${num(r.rate)}`}</div>
-      <div class="val">${money(num(r.value)*num(r.rate))}${e?`<button class="bdel" data-del="rental" data-idx="${i}">×</button>`:""}</div></div>`;
+    const cost=num(r.value)*(num(r.rate)/100)*days;
+    h+=`<div class="brow"><div class="nm">${e?inp("rental",i,"name",r.name,"nm"):esc(r.name||"—")}
+        <span class="sub">${e?`rate ${inp("rental",i,"rate",r.rate)}%/day`:`${num(r.rate)}%/day`}</span></div>
+      <div class="val act">${e?inp("rental",i,"value",r.value):money(r.value)}</div>
+      <div class="val">${money(cost)}${e?`<button class="bdel" data-del="rental" data-idx="${i}">×</button>`:""}</div></div>`;
   });
-  if(e) h+=`<div class="baddrow"><button class="badd" data-add="rental">+ Add rental line</button></div>`;
-  if(!(budget.rental||[]).length && !e) h+=`<div class="brow"><div class="nm sub">No equipment rental</div><div class="val act">$0.00</div><div class="val">$0.00</div></div>`;
-  h+=`<div class="brow tot"><div class="nm">Estimated Total Rental (ETRM)</div><div class="val act">${money(c.ETRMa)}</div><div class="val">${money(c.ETRMe)}</div></div></div>`;
+  if(e) h+=`<div class="baddrow"><button class="badd" data-add="rental">+ Add equipment</button></div>`;
+  if(!(budget.rental||[]).length && !e) h+=`<div class="brow"><div class="nm sub">No equipment rental</div><div class="val act">—</div><div class="val">$0.00</div></div>`;
+  h+=`<div class="brow tot"><div class="nm">Estimated Total Rental (ETRM)</div><div class="val act"></div><div class="val">${money(c.ETRMe)}</div></div></div>`;
 
   // ---- Totals ----
   h+=`<div class="btable">${head("Project Total")}
@@ -1265,7 +1273,7 @@ $("#viewBudget").addEventListener("click",ev=>{
   const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]");
   if(add){ const s=add.dataset.add; if(!budget[s])budget[s]=[];
     const def={labor:{name:"New role",rate:12,hrsA:0,hrsE:0},contract:{name:"New contractor",rate:0,hrsA:0,hrsE:0},
-      material:{name:"New item",a:0,e:0},rental:{name:"New equipment",value:0,rate:0}}[s];
+      material:{name:"New item",a:0,e:0},rental:{name:"New equipment",value:0,rate:0.2}}[s];
     budget[s].push({...def}); saveBudget(); renderBudget(); }
   if(del){ const s=del.dataset.del, i=+del.dataset.idx; budget[s].splice(i,1); saveBudget(); renderBudget(); }
 });
@@ -1332,9 +1340,9 @@ function exportMarkdown(){
   (budget.material||[]).forEach(r=>{ m+=`| ${mdEsc(r.name)} | ${money(r.a)} | ${money(r.e)} |\n`; });
   m+=`| **Total Materials** | **${money(b.TDMa)}** | **${money(b.TDMe)}** |\n\n`;
   if((budget.rental||[]).length){
-    m+=`### Equipment Rental\n\n| Item | Actual | Estimate |\n|---|---|---|\n`;
-    (budget.rental||[]).forEach(r=>{ m+=`| ${mdEsc(r.name||"—")} | ${money(num(r.value)*num(r.rate))} | ${money(num(r.value)*num(r.rate))} |\n`; });
-    m+=`| **Total Rental** | **${money(b.ETRMa)}** | **${money(b.ETRMe)}** |\n\n`;
+    m+=`### Equipment Rental (${projectDays()} days @ rate%/day)\n\n| Item | Value | Rate/day | Cost |\n|---|---|---|---|\n`;
+    (budget.rental||[]).forEach(r=>{ m+=`| ${mdEsc(r.name||"—")} | ${money(r.value)} | ${num(r.rate)}% | ${money(num(r.value)*(num(r.rate)/100)*projectDays())} |\n`; });
+    m+=`| **Total Rental** |  |  | **${money(b.ETRMe)}** |\n\n`;
   }
   m+=`### Totals\n\n| | Actual | Estimate |\n|---|---|---|\n`;
   m+=`| Subtotal (TDL + TCL + TDM + ETRM) | ${money(b.subA)} | ${money(b.subE)} |\n`;
@@ -1359,6 +1367,9 @@ function budgetHTML(){
     h+=tbl('Contract Labor',['Item','Rate','Hrs(A)','Hrs(E)','Actual','Estimate'],cr,`<tr class="tt"><td>Total Contract Labor</td><td></td><td></td><td></td><td>${money(b.TCLa)}</td><td>${money(b.TCLe)}</td></tr>`); }
   let mr=(budget.material||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${money(r.a)}</td><td>${money(r.e)}</td></tr>`).join('');
   h+=tbl('Direct Materials',['Item','Actual','Estimate'],mr,`<tr class="tt"><td>Total Materials</td><td>${money(b.TDMa)}</td><td>${money(b.TDMe)}</td></tr>`);
+  if((budget.rental||[]).length){ const days=projectDays();
+    let rr=(budget.rental||[]).map(r=>`<tr><td>${esc(r.name||'—')}</td><td>${money(r.value)}</td><td>${num(r.rate)}%</td><td>${money(num(r.value)*(num(r.rate)/100)*days)}</td></tr>`).join('');
+    h+=tbl(`Equipment Rental (${days} days @ rate%/day)`,['Item','Value','Rate/day','Cost'],rr,`<tr class="tt"><td>Total Rental</td><td></td><td></td><td>${money(b.ETRMe)}</td></tr>`); }
   h+=tbl('Totals',['','Actual','Estimate'],
     `<tr><td>Subtotal</td><td>${money(b.subA)}</td><td>${money(b.subE)}</td></tr><tr class="oh"><td>Business overhead (${Math.round(b.boh*100)}%)</td><td>${money(b.bizA)}</td><td>${money(b.bizE)}</td></tr>`,
     `<tr class="tt big"><td>Total Cost</td><td>${money(b.totalA)}</td><td>${money(b.totalE)}</td></tr>`);
