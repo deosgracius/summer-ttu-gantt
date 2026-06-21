@@ -384,6 +384,8 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .exmenu{position:fixed; z-index:120; background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--card-shadow-hover); padding:6px; min-width:230px; animation:fade .12s}
 .exmenu button{display:block; width:100%; text-align:left; padding:9px 12px; border-radius:7px; font-size:12.5px; font-weight:500; background:transparent; color:var(--txt2)}
 .exmenu button:hover{background:var(--panel2); color:var(--txt)}
+.bresync{border:1px solid var(--line-strong); background:var(--input-bg); color:var(--mut); border-radius:6px; width:24px; height:24px; font-size:13px; margin-left:4px; vertical-align:middle}
+.bresync:hover{color:var(--deo); border-color:var(--deo)}
 </style>
 </head>
 <body>
@@ -821,14 +823,14 @@ function renderDash(){
   // expected student-hours = weeks × 12 × number of members; logged = total of each member's hours
   const nMembers=Math.max(1, memberList().length);
   const est=NW()*12*nMembers;
-  const log=memberList().reduce((s,m)=>s+memberLogged(m),0);
+  const log=memberList().reduce((s,m)=>s+memberActualHours(m),0);
   const hPct= est? Math.min(100,Math.round(log/est*100)):0;
   // expected progress by schedule
   const nw=cfg.now_week, tw=NW()||1;
   const expected=Math.round(Math.min(1,(nw+1)/tw)*100);
   const onTrack=avg>=expected-8;
   const ownerStats=o=>{const a=tasks.filter(t=>ownerCanon(t.owner)===o); const p=a.length?Math.round(a.reduce((s,t)=>s+t.comp,0)/a.length):0; return {n:a.length,p};};
-  const dStats=ownerList().map(o=>({o,...ownerStats(o)})).filter(s=>s.n>0||s.o==="Shared");
+  const dStats=ownerList().map(o=>({o,...ownerStats(o)}));
 
   $("#dash").innerHTML = `
    <div class="card">${ringSvg(avg)}<div class="k">Overall progress</div>
@@ -1131,9 +1133,12 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>setView(t.dataset.vie
 /* ====================== BUDGET ====================== */
 const num=x=>+x||0;
 const money=n=>"$"+(Math.round(num(n)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
-/* a member's actual hours = sum of logged hours on their tasks (from the timeline) */
+/* a member's actual hours = sum of logged hours on their tasks (from the timeline),
+   unless manually corrected in the budget (l.manualA) */
 function memberLogged(name){ return tasks.reduce((s,t)=> s + (ownerCanon(t.owner)===name ? (+t.logged_hours||0) : 0), 0); }
-function syncLaborHours(){ (budget.labor||[]).forEach(l=>{ if(memberList().includes(l.name)) l.hrsA = memberLogged(l.name); }); }
+function laborLine(name){ return (budget.labor||[]).find(l=>l.name===name); }
+function memberActualHours(name){ const l=laborLine(name); if(l&&l.manualA) return num(l.hrsA); return memberLogged(name); }
+function syncLaborHours(){ (budget.labor||[]).forEach(l=>{ if(memberList().includes(l.name) && !l.manualA) l.hrsA = memberLogged(l.name); }); }
 function calcBudget(){
   syncLaborHours();
   const b=budget, L=b.labor||[], C=b.contract||[], M=b.material||[], R=b.rental||[];
@@ -1194,10 +1199,14 @@ function renderBudget(){
   (budget.labor||[]).forEach((r,i)=>{
     const isMem=memberList().includes(r.name);
     const a=num(r.rate)*num(r.hrsA), es=num(r.rate)*num(r.hrsE);
-    // actual hours come from the timeline (logged hours) for member lines — read-only
-    const actCell = (e && !isMem)
-      ? `${inp("labor",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`
-      : `${money(a)}<div class="sub">${num(r.hrsA)} hrs${isMem?' · from timeline':''}</div>`;
+    // actual hours: auto from the timeline; editable to correct a mistake (becomes a manual override)
+    let actCell;
+    if(e){
+      actCell = `${inp("labor",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`
+              + (isMem ? (r.manualA ? ` <button class="bresync" data-resync="${i}" title="Reset to timeline">↻</button>` : `<div class="sub">auto from timeline</div>`) : '');
+    } else {
+      actCell = `${money(a)}<div class="sub">${num(r.hrsA)} hrs${isMem?(r.manualA?' · edited':' · from timeline'):''}</div>`;
+    }
     h+=`<div class="brow"><div class="nm">${e?inp("labor",i,"name",r.name,"nm"):esc(r.name)}
         <span class="sub">${e?`$${inp("labor",i,"rate",r.rate)}/hr`:`$${num(r.rate)}/hr`}</span></div>
       <div class="val act">${actCell}</div>
@@ -1267,16 +1276,20 @@ $("#viewBudget").addEventListener("change",ev=>{
   if(field==="laborOhRate"||field==="bizOhRate"){ v=num(v)/100; }
   else if(field==="name"||dateFields.includes(field)){ /* keep string */ }
   else { v=num(v); }
-  if(sec==="root"){ budget[field]=v; } else { if(!budget[sec])budget[sec]=[]; budget[sec][idx][field]=v; }
+  if(sec==="root"){ budget[field]=v; } else { if(!budget[sec])budget[sec]=[]; budget[sec][idx][field]=v;
+    // editing a member's actual hours = a manual correction that overrides the timeline sum
+    if(sec==="labor" && field==="hrsA" && memberList().includes(budget.labor[idx].name)) budget.labor[idx].manualA=true;
+  }
   saveBudget(); renderBudget();
 });
 $("#viewBudget").addEventListener("click",ev=>{
-  const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]");
+  const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]"), rs=ev.target.closest("[data-resync]");
   if(add){ const s=add.dataset.add; if(!budget[s])budget[s]=[];
     const def={labor:{name:"New role",rate:12,hrsA:0,hrsE:0},contract:{name:"New contractor",rate:0,hrsA:0,hrsE:0},
       material:{name:"New item",a:0,e:0},rental:{name:"New equipment",value:0,rate:0.2}}[s];
     budget[s].push({...def}); saveBudget(); renderBudget(); }
   if(del){ const s=del.dataset.del, i=+del.dataset.idx; budget[s].splice(i,1); saveBudget(); renderBudget(); }
+  if(rs){ const i=+rs.dataset.resync; if(budget.labor[i]){ delete budget.labor[i].manualA; budget.labor[i].hrsA=memberLogged(budget.labor[i].name); } saveBudget(); renderBudget(); }
 });
 let budgetSaveT;
 function saveBudget(){ setSync("saving"); clearTimeout(budgetSaveT); budgetSaveT=setTimeout(async()=>{
