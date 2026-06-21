@@ -818,10 +818,10 @@ function renderDash(){
   const total=tasks.length;
   const done=tasks.filter(t=>t.comp>=100).length;
   const avg= total? Math.round(tasks.reduce((s,t)=>s+t.comp,0)/total):0;
-  // expected student-hours = weeks × 12 × number of members
+  // expected student-hours = weeks × 12 × number of members; logged = total of each member's hours
   const nMembers=Math.max(1, memberList().length);
   const est=NW()*12*nMembers;
-  const log=tasks.reduce((s,t)=>s+t.logged_hours,0);
+  const log=memberList().reduce((s,m)=>s+memberLogged(m),0);
   const hPct= est? Math.min(100,Math.round(log/est*100)):0;
   // expected progress by schedule
   const nw=cfg.now_week, tw=NW()||1;
