@@ -358,6 +358,32 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .agroup .aacts .areset:hover{background:color-mix(in srgb,var(--both) 16%,transparent); color:var(--both); border-color:var(--both)}
 .abanner{display:flex; align-items:center; gap:10px; background:color-mix(in srgb,var(--both) 12%,transparent); border:1px solid color-mix(in srgb,var(--both) 35%,transparent); color:var(--txt); border-radius:10px; padding:9px 14px; margin-bottom:14px; font-size:12.5px; font-weight:600}
 .abanner button{margin-left:auto; padding:6px 12px; border-radius:7px; border:1px solid var(--line-strong); background:var(--panel); color:var(--txt); font-size:12px; font-weight:600}
+
+/* view toggle + progress cells + drag */
+.vtoggle{display:flex; gap:3px; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:3px}
+.vtab{padding:7px 13px; border-radius:6px; font-size:12px; font-weight:600; background:transparent; color:var(--mut)}
+.vtab:hover{color:var(--txt2)}
+.vtab.active{background:var(--panel); color:var(--txt); box-shadow:var(--card-shadow)}
+.ptrack{position:relative}
+.pcell{position:absolute; top:6px; bottom:6px; border-radius:5px; box-shadow:var(--bar-shadow); cursor:default; transition:transform .1s}
+.editing .pcell{cursor:pointer}
+.pcell:hover{transform:translateY(-1px)}
+.namecell .drag{cursor:grab; color:var(--faint); font-size:13px; flex:none; user-select:none; margin-right:-2px}
+.namecell[draggable="true"]{cursor:grab}
+.namecell.dragover{box-shadow:inset 0 3px 0 -1px var(--deo)}
+.namecell.dragging{opacity:.4}
+#statusLegend b{font-weight:600}
+.colorgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.colorgrid label{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--txt2); background:var(--input-bg); border:1px solid var(--line-strong); border-radius:9px; padding:7px 11px}
+.colorgrid input[type=color]{width:38px; height:26px; border:0; background:none; padding:0; border-radius:6px; cursor:pointer}
+#s_members{display:flex; flex-direction:column; gap:7px}
+#s_members .memrow{display:flex; gap:7px}
+#s_members .memrow input{flex:1}
+#s_members .smdel{flex:none; width:36px; border:1px solid var(--line-strong); background:var(--input-bg); color:var(--mut); border-radius:8px; font-size:15px}
+#s_members .smdel:hover{background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad)}
+.exmenu{position:fixed; z-index:120; background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--card-shadow-hover); padding:6px; min-width:230px; animation:fade .12s}
+.exmenu button{display:block; width:100%; text-align:left; padding:9px 12px; border-radius:7px; font-size:12.5px; font-weight:500; background:transparent; color:var(--txt2)}
+.exmenu button:hover{background:var(--panel2); color:var(--txt)}
 </style>
 </head>
 <body>
@@ -463,14 +489,15 @@ button{font-family:var(--font); cursor:pointer; border:0}
   <div class="dash" id="dash"></div>
 
   <div class="controls">
+    <div class="vtoggle">
+      <button class="vtab" data-tl="detailed" type="button">Detailed</button>
+      <button class="vtab" data-tl="progress" type="button">Progress</button>
+    </div>
     <div class="search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="search" placeholder="Search tasks…"></div>
     <div class="chips" id="ownerChips"></div>
-    <div class="legend">
-      <b><span class="d" style="background:var(--deo)"></span>Deo · Backend</b>
-      <b><span class="d" style="background:var(--can)"></span>Cannon · Frontend</b>
-      <b><span class="d" style="background:var(--both)"></span>Shared</b>
-    </div>
+    <div class="legend" id="legend"></div>
+    <div class="legend" id="statusLegend" style="display:none"></div>
   </div>
 
   <div class="gwrap"><div class="grid" id="grid"><div class="skel"></div></div>
@@ -492,11 +519,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
   <div class="field"><label>Task name</label><input id="f_name" placeholder="e.g. Booking endpoints"></div>
   <div class="field"><label>Section</label><input id="f_section" list="secList" placeholder="e.g. Backend Development"><datalist id="secList"></datalist></div>
   <div class="field"><label>Owner</label>
-    <div class="ownerseg" id="f_owner">
-      <button data-o="Deo"><span class="d" style="background:var(--deo)"></span>Deo</button>
-      <button data-o="Cannon"><span class="d" style="background:var(--can)"></span>Cannon</button>
-      <button data-o="Both"><span class="d" style="background:var(--both)"></span>Shared</button>
-    </div>
+    <div class="ownerseg" id="f_owner"></div>
   </div>
   <div class="row2">
     <div class="field"><label>Start week</label><select id="f_w0"></select></div>
@@ -525,6 +548,21 @@ button{font-family:var(--font); cursor:pointer; border:0}
   <div class="field"><label>Subtitle</label><input id="s_sub"></div>
   <div class="field"><label>Current week (NOW marker)</label><select id="s_now"></select></div>
   <div class="acts2"><button class="btn-save" id="sSave">Save</button><button class="btn-ghost" id="sCancel">Close</button></div>
+  <div class="divider"></div>
+  <h3 style="font-size:15px">Members</h3>
+  <p class="hint">Used for task owners and the Direct Labor budget.</p>
+  <div id="s_members"></div>
+  <div class="memrow" style="margin-top:8px"><input id="s_newmem" class="bin nm" placeholder="Add a member…"><button class="btn-ghost" id="s_addmem" type="button" style="flex:none;padding:8px 14px">Add</button></div>
+  <div class="divider"></div>
+  <h3 style="font-size:15px">Progress view colors</h3>
+  <p class="hint">Colors for the Progress timeline (saved on this device).</p>
+  <div class="colorgrid">
+    <label>Done <input type="color" id="sc_done"></label>
+    <label>Behind <input type="color" id="sc_behind"></label>
+    <label>In progress <input type="color" id="sc_progress"></label>
+    <label>Next <input type="color" id="sc_next"></label>
+  </div>
+  <div class="acts2"><button class="btn-save" id="sColors">Save colors</button><button class="btn-ghost" id="sColorsReset" type="button">Reset</button></div>
   <div class="divider"></div>
   <h3 style="font-size:15px">Change passcode</h3>
   <div class="row2">
@@ -555,8 +593,19 @@ const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const POLL_MS = 6000;
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-const COLOR = {Deo:"var(--deo)", Cannon:"var(--can)", Both:"var(--both)"};
-const OWNERS = {Deo:"Deo · Backend", Cannon:"Cannon · Frontend", Both:"Shared"};
+/* ---- member-based owners (names come from registration) + Shared ---- */
+const OWNER_PALETTE = ["#0ea5e9","#8b5cf6","#ec4899","#14b8a6","#f97316","#6366f1","#84cc16","#e11d48"];
+function memberList(){ return (cfg.members||[]).slice(); }
+function ownerList(){ const o=memberList(); o.push("Shared"); return o; }
+function ownerCanon(o){ return (o==="Both")?"Shared":(o||"Shared"); }
+function ownerLabel(o){ return ownerCanon(o); }
+function ownerColor(o){ o=ownerCanon(o); if(o==="Shared") return "var(--both)";
+  const i=memberList().indexOf(o); if(i>=0) return OWNER_PALETTE[i%OWNER_PALETTE.length];
+  let h=0; for(let k=0;k<o.length;k++) h=(h*31+o.charCodeAt(k))%360; return "hsl("+h+" 60% 55%)"; }
+/* default status colors for the Progress view (user-customizable, stored locally) */
+const DEFAULT_STATUS={done:"#16a34a",behind:"#dc2626",progress:"#eab308",next:"#2563eb"};
+function statusColors(){ try{return {...DEFAULT_STATUS,...JSON.parse(localStorage.getItem("eh_status")||"{}")};}catch(e){return {...DEFAULT_STATUS};} }
+let timelineView = localStorage.getItem("eh_tlview")||"detailed";
 
 /* ====================== STATE ====================== */
 let PASS = sessionStorage.getItem("eh_pass") || "";
@@ -576,6 +625,7 @@ async function rpc(fn, args){ const {data,error}=await sb.rpc(fn,args); if(error
 async function apiLoad(){ const d=await rpc("gantt_load",{p:PASS}); return d; }
 async function apiSave(t){ return rpc("gantt_save",{p:PASS,t}); }
 async function apiDelete(id){ return rpc("gantt_delete",{p:PASS,tid:id}); }
+async function apiReorder(ids){ return rpc("gantt_reorder",{p:PASS,ids}); }
 async function apiSetNow(n){ return rpc("gantt_set_now",{p:PASS,n}); }
 async function apiSetMeta(t,s){ return rpc("gantt_set_meta",{p:PASS,new_title:t,new_subtitle:s}); }
 async function apiSetPass(o,n){ return rpc("gantt_set_passcode",{p_old:o,p_new:n}); }
@@ -775,8 +825,8 @@ function renderDash(){
   const nw=cfg.now_week, tw=NW()||1;
   const expected=Math.round(Math.min(1,(nw+1)/tw)*100);
   const onTrack=avg>=expected-8;
-  const ownerStats=o=>{const a=tasks.filter(t=>t.owner===o); const p=a.length?Math.round(a.reduce((s,t)=>s+t.comp,0)/a.length):0; return {n:a.length,p};};
-  const dStats=["Deo","Cannon","Both"].map(o=>({o,...ownerStats(o)}));
+  const ownerStats=o=>{const a=tasks.filter(t=>ownerCanon(t.owner)===o); const p=a.length?Math.round(a.reduce((s,t)=>s+t.comp,0)/a.length):0; return {n:a.length,p};};
+  const dStats=ownerList().map(o=>({o,...ownerStats(o)})).filter(s=>s.n>0||s.o==="Shared");
 
   $("#dash").innerHTML = `
    <div class="card">${ringSvg(avg)}<div class="k">Overall progress</div>
@@ -792,33 +842,40 @@ function renderDash(){
      <div class="pbar"><i style="width:${hPct}%"></i></div></div>
    <div class="card"><div class="k">By owner</div>
      <div class="owners" style="margin-top:8px">
-       ${dStats.map(s=>`<div class="orow"><div class="nm"><span class="d" style="background:${COLOR[s.o]}"></span>${s.o==="Both"?"Shared":s.o}</div>
-         <div class="ob"><i style="width:${s.p}%;background:${COLOR[s.o]}"></i></div><div class="pc">${s.p}%</div></div>`).join("")}
+       ${dStats.map(s=>`<div class="orow"><div class="nm" title="${esc(s.o)}"><span class="d" style="background:${ownerColor(s.o)}"></span>${esc(s.o)}</div>
+         <div class="ob"><i style="width:${s.p}%;background:${ownerColor(s.o)}"></i></div><div class="pc">${s.p}%</div></div>`).join("")}
      </div></div>`;
 }
 
 /* ====================== RENDER: CHIPS ====================== */
 function renderChips(){
-  const counts={All:tasks.length, Deo:0, Cannon:0, Both:0};
-  tasks.forEach(t=>counts[t.owner]!=null&&counts[t.owner]++);
-  const defs=[["All","All",null],["Deo","Deo",COLOR.Deo],["Cannon","Cannon",COLOR.Cannon],["Both","Shared",COLOR.Both]];
+  const count=o=>tasks.filter(t=>ownerCanon(t.owner)===o).length;
+  const defs=[["All","All",null], ...ownerList().map(o=>[o,o,ownerColor(o)])];
   $("#ownerChips").innerHTML = defs.map(([k,lab,col])=>`
-    <button class="chip ${filterOwner===k?'active':''}" data-o="${k}" ${filterOwner===k?'style="background:var(--primary)"':''}>
-      ${col?`<span class="d" style="background:${col}"></span>`:""}${lab} <span style="opacity:.6">${counts[k]}</span></button>`).join("");
+    <button class="chip ${filterOwner===k?'active':''}" data-o="${esc(k)}" ${filterOwner===k?'style="background:var(--primary)"':''}>
+      ${col?`<span class="d" style="background:${col}"></span>`:""}${esc(lab)} <span style="opacity:.6">${k==="All"?tasks.length:count(k)}</span></button>`).join("");
   document.querySelectorAll("#ownerChips .chip").forEach(c=>c.onclick=()=>{filterOwner=c.dataset.o; renderChips(); renderGrid();});
 }
 
 /* ====================== RENDER: GANTT ====================== */
+const NAMEW=264, COLW=124;
 function visibleTasks(){
-  return tasks.filter(t=>(filterOwner==="All"||t.owner===filterOwner) &&
+  return tasks.filter(t=>(filterOwner==="All"||ownerCanon(t.owner)===filterOwner) &&
     (!filterText || (t.name+" "+t.section).toLowerCase().includes(filterText)));
 }
 function sectionsOf(list){
   const seen=[]; list.forEach(t=>{if(!seen.includes(t.section))seen.push(t.section);}); return seen;
 }
+/* status for the Progress view: done / behind / in-progress / next */
+function weekStatus(t,w){ const sc=statusColors();
+  if(t.comp>=100) return sc.done;
+  if(w<cfg.now_week) return sc.behind;
+  if(w===cfg.now_week) return sc.progress;
+  return sc.next;
+}
 function renderGrid(){
-  const grid=$("#grid"), n=NW();
-  grid.style.gridTemplateColumns="264px repeat("+n+",1fr)";
+  const grid=$("#grid"), n=NW(); const progress = timelineView==="progress";
+  grid.style.gridTemplateColumns=NAMEW+"px repeat("+n+","+COLW+"px)";
   let h='<div class="gh namecell">Task</div>';
   cfg.weeks.forEach((w,i)=>{h+=`<div class="gh cell wk ${i===cfg.now_week?'isnow':''}"><div class="l">${esc(w.label)}</div><div class="r mono">${esc(w.range)}</div></div>`;});
   const list=visibleTasks();
@@ -828,49 +885,84 @@ function renderGrid(){
     const sp=items.length?Math.round(items.reduce((s,t)=>s+t.comp,0)/items.length):0;
     h+=`<div class="sec"><span>${esc(sec)}</span><span class="cnt mono">${items.length}</span><div class="secbar"><i style="width:${sp}%"></i></div><span class="cnt mono">${sp}%</span></div>`;
     items.forEach(t=>{
-      h+=`<div class="namecell"><span class="d" style="background:${COLOR[t.owner]}"></span><span class="nm" title="${esc(t.name)}">${esc(t.name)}</span>
+      h+=`<div class="namecell"${editMode?` draggable="true" data-drag="${t.id}"`:''}>${editMode?'<span class="drag">⠿</span>':''}<span class="d" style="background:${ownerColor(t.owner)}"></span><span class="nm" title="${esc(t.name)} · ${esc(ownerLabel(t.owner))}">${esc(t.name)}</span>
         <span class="acts"><button class="mini" data-edit="${t.id}">✎</button><button class="mini del" data-del="${t.id}">×</button></span></div>`;
-      const left=t.w0/n*100, width=(t.w1-t.w0+1)/n*100;
-      h+=`<div class="track"><div class="bar ${t.comp>=100?'done':''}" data-edit="${t.id}" data-tip="${t.id}"
-        style="left:${left}%;width:calc(${width}% - 7px);background:${COLOR[t.owner]}">
-        <span class="fill" style="width:${t.comp}%"></span><span class="stripe"></span>
-        <span class="lbl">${esc(t.name)} · ${t.comp}%</span></div></div>`;
+      if(progress){
+        let cells='';
+        for(let w=t.w0; w<=t.w1 && w<n; w++){
+          cells+=`<div class="pcell" data-edit="${t.id}" data-tip="${t.id}" title="${esc(t.name)}" style="left:${w*COLW}px;width:${COLW-3}px;background:${weekStatus(t,w)}"></div>`;
+        }
+        h+=`<div class="track ptrack">${cells}</div>`;
+      } else {
+        const left=t.w0*COLW, width=(t.w1-t.w0+1)*COLW;
+        h+=`<div class="track"><div class="bar ${t.comp>=100?'done':''}" data-edit="${t.id}" data-tip="${t.id}"
+          style="left:${left}px;width:${width-7}px;background:${ownerColor(t.owner)}">
+          <span class="fill" style="width:${t.comp}%"></span><span class="stripe"></span>
+          <span class="lbl">${esc(t.name)} · ${t.comp}%</span></div></div>`;
+      }
     });
   });
   if(!list.length) h+=`<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--mut)">No tasks match your filter.</div>`;
   grid.innerHTML=h;
   $(".gwrap").classList.toggle("editing",editMode);
-  // bind
   grid.querySelectorAll("[data-edit]").forEach(el=>el.onclick=e=>{ if(editMode||el.classList.contains("mini")){e.stopPropagation();openTask(el.dataset.edit);} });
   grid.querySelectorAll("[data-del]").forEach(el=>el.onclick=e=>{e.stopPropagation();delTask(el.dataset.del);});
-  grid.querySelectorAll(".bar[data-tip]").forEach(el=>{
+  grid.querySelectorAll("[data-tip]").forEach(el=>{
     el.addEventListener("mousemove",ev=>showBarTip(el.dataset.tip,ev));
     el.addEventListener("mouseleave",hideTip);
   });
+  if(editMode) bindDrag(grid);
+  $("#statusLegend").style.display = progress ? "flex" : "none";
   placeOverlay();
 }
+/* drag to reorder */
+let dragId=null;
+function bindDrag(grid){
+  grid.querySelectorAll("[data-drag]").forEach(el=>{
+    el.addEventListener("dragstart",e=>{ dragId=el.dataset.drag; el.classList.add("dragging"); });
+    el.addEventListener("dragend",()=>{ dragId=null; el.classList.remove("dragging"); });
+    el.addEventListener("dragover",e=>{ e.preventDefault(); el.classList.add("dragover"); });
+    el.addEventListener("dragleave",()=>el.classList.remove("dragover"));
+    el.addEventListener("drop",e=>{ e.preventDefault(); el.classList.remove("dragover"); dropOn(el.dataset.drag); });
+  });
+}
+async function dropOn(targetId){
+  if(!dragId||dragId===targetId) return;
+  const from=tasks.findIndex(t=>t.id===dragId); if(from<0) return;
+  const moved=tasks[from];
+  const tSec=(tasks.find(t=>t.id===targetId)||{}).section; if(tSec) moved.section=tSec;
+  tasks.splice(from,1);
+  const to=tasks.findIndex(t=>t.id===targetId);
+  tasks.splice(to<0?tasks.length:to,0,moved);
+  tasks.forEach((t,i)=>t.sort_order=i);
+  renderGrid();
+  setSync("saving");
+  try{ await apiSave({...moved}); await apiReorder(tasks.map(t=>t.id)); setSync("live"); }catch(e){ setSync("off"); }
+}
 function placeOverlay(){
-  const grid=$("#grid"), gw=$(".gwrap"); const r=grid.getBoundingClientRect();
-  const n=NW(); const colW=(r.width-264)/n;
-  const nc=$("#nowcol"); nc.style.left=(264+cfg.now_week*colW)+"px"; nc.style.width=colW+"px";
-  const hov=$("#hov"); hov.style.left="264px"; hov.style.right="0"; hov.style.pointerEvents=editMode?"none":"auto"; hov.innerHTML="";
-  for(let i=0;i<n;i++){const s=document.createElement("div");s.className="hstrip";s.style.left=(i*colW)+"px";s.style.width=colW+"px";
+  const n=NW();
+  const nc=$("#nowcol"); nc.style.left=(NAMEW+cfg.now_week*COLW)+"px"; nc.style.width=COLW+"px";
+  const hov=$("#hov"); hov.style.left=NAMEW+"px"; hov.style.right="auto"; hov.style.width=(n*COLW)+"px";
+  hov.style.pointerEvents=editMode?"none":"auto"; hov.innerHTML="";
+  for(let i=0;i<n;i++){const s=document.createElement("div");s.className="hstrip";s.style.left=(i*COLW)+"px";s.style.width=COLW+"px";
     s.addEventListener("mousemove",e=>showWeekTip(i,e));s.addEventListener("mouseleave",hideTip);hov.appendChild(s);}
+  const gw=$(".gwrap"); gw.onscroll=()=>{ const s=gw.scrollLeft; nc.style.transform=`translateX(${-s}px)`; hov.style.transform=`translateX(${-s}px)`; };
+  gw.onscroll();
 }
 
 /* ====================== TOOLTIPS ====================== */
 const tip=$("#tip");
 function posTip(e){const pad=14;let x=e.clientX+16,y=e.clientY+16;const tw=tip.offsetWidth,th=tip.offsetHeight;
   if(x+tw+pad>innerWidth)x=e.clientX-tw-16; if(y+th+pad>innerHeight)y=innerHeight-th-pad; if(y<pad)y=pad; tip.style.left=x+"px";tip.style.top=y+"px";}
-function tasksFor(w,o){return tasks.filter(t=>t.owner===o&&t.w0<=w&&t.w1>=w);}
+function tasksFor(w,o){return tasks.filter(t=>ownerCanon(t.owner)===o&&t.w0<=w&&t.w1>=w);}
 function listHtml(a){return a.length?'<ul>'+a.map(t=>`<li>${esc(t.name)} <b>${t.comp}% · ${fmtH(t.logged_hours)}/${fmtH(t.est_hours)}h</b></li>`).join('')+'</ul>':'<div class="none">— nothing scheduled —</div>';}
 function showWeekTip(w,e){const wk=cfg.weeks[w];if(!wk)return;
   tip.innerHTML=`<h4>${esc(wk.label)} <span class="mono">${esc(wk.range)}</span></h4>`+
-   ["Deo","Cannon","Both"].map(o=>`<div class="grp"><div class="who"><span class="d" style="background:${COLOR[o]}"></span>${OWNERS[o]}</div>${listHtml(tasksFor(w,o))}</div>`).join("");
+   ownerList().map(o=>`<div class="grp"><div class="who"><span class="d" style="background:${ownerColor(o)}"></span>${esc(o)}</div>${listHtml(tasksFor(w,o))}</div>`).join("");
   tip.style.opacity="1";posTip(e);}
 function showBarTip(id,e){const t=tasks.find(x=>x.id===id);if(!t)return;const w0=cfg.weeks[t.w0],w1=cfg.weeks[t.w1];
-  tip.innerHTML=`<h4>${esc(t.name)} <span class="d" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${COLOR[t.owner]}"></span></h4>
-   <div style="color:var(--mut);font-size:11.5px">${OWNERS[t.owner]} · ${esc(t.section)}</div>
+  tip.innerHTML=`<h4>${esc(t.name)} <span class="d" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${ownerColor(t.owner)}"></span></h4>
+   <div style="color:var(--mut);font-size:11.5px">${esc(ownerLabel(t.owner))} · ${esc(t.section)}</div>
    <div class="grp" style="display:flex;gap:14px;margin-top:9px">
      <div><div style="color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Weeks</div><div class="mono" style="font-weight:700">${esc(w0?w0.label:'')}→${esc(w1?w1.label:'')}</div></div>
      <div><div style="color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Done</div><div class="mono" style="font-weight:700">${t.comp}%</div></div>
@@ -879,8 +971,21 @@ function showBarTip(id,e){const t=tasks.find(x=>x.id===id);if(!t)return;const w0
   tip.style.opacity="1";posTip(e);}
 function hideTip(){tip.style.opacity="0";}
 
+/* ====================== LEGEND + VIEW TOGGLE ====================== */
+function renderLegend(){
+  $("#legend").innerHTML = ownerList().map(o=>`<b><span class="d" style="background:${ownerColor(o)}"></span>${esc(o)}</b>`).join("");
+  const sc=statusColors();
+  $("#statusLegend").innerHTML = [["Done",sc.done],["Behind",sc.behind],["In progress",sc.progress],["Next",sc.next]]
+    .map(([l,c])=>`<b><span class="d" style="background:${c}"></span>${l}</b>`).join("");
+}
+function setTimelineView(v){ timelineView=v; localStorage.setItem("eh_tlview",v);
+  document.querySelectorAll(".vtab").forEach(b=>b.classList.toggle("active",b.dataset.tl===v));
+  renderLegend(); renderGrid(); }
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>setTimelineView(b.dataset.tl));
+
 /* ====================== RENDER ALL ====================== */
-function renderAll(){ renderDash(); renderChips(); renderGrid(); fillWeekSelects(); fillSecList(); renderBudget(); }
+function renderAll(){ renderDash(); renderChips(); renderLegend(); renderGrid(); fillWeekSelects(); fillSecList(); renderBudget();
+  document.querySelectorAll(".vtab").forEach(b=>b.classList.toggle("active",b.dataset.tl===timelineView)); }
 
 /* ====================== TASK MODAL ====================== */
 function fillWeekSelects(){
@@ -889,9 +994,13 @@ function fillWeekSelects(){
   $("#s_now").innerHTML=cfg.weeks.map((w,i)=>`<option value="${i}">${esc(w.label)} · ${esc(w.range)}</option>`).join("");
 }
 function fillSecList(){ $("#secList").innerHTML=sectionsOf(tasks).map(s=>`<option value="${esc(s)}">`).join(""); }
-let chosenOwner="Deo";
-function setOwnerSeg(o){chosenOwner=o;document.querySelectorAll("#f_owner button").forEach(b=>{const on=b.dataset.o===o;b.classList.toggle("sel",on);b.style.background=on?COLOR[o]:"";});}
-document.querySelectorAll("#f_owner button").forEach(b=>b.onclick=()=>setOwnerSeg(b.dataset.o));
+let chosenOwner="Shared";
+function buildOwnerSeg(current){
+  const opts=ownerList(); if(current && !opts.includes(ownerCanon(current))) opts.unshift(ownerCanon(current));
+  $("#f_owner").innerHTML=opts.map(o=>`<button type="button" data-o="${esc(o)}"><span class="d" style="background:${ownerColor(o)}"></span>${esc(o)}</button>`).join("");
+  document.querySelectorAll("#f_owner button").forEach(b=>b.onclick=()=>setOwnerSeg(b.dataset.o));
+}
+function setOwnerSeg(o){chosenOwner=ownerCanon(o);document.querySelectorAll("#f_owner button").forEach(b=>{const on=b.dataset.o===chosenOwner;b.classList.toggle("sel",on);b.style.background=on?ownerColor(chosenOwner):"";});}
 $("#f_comp").addEventListener("input",e=>$("#f_compVal").textContent=e.target.value+"%");
 
 function openTask(id){
@@ -900,7 +1009,8 @@ function openTask(id){
   $("#tmTitle").textContent = t?"Edit task":"Add task";
   $("#tmDel").style.display = t?"":"none";
   $("#f_name").value=t?t.name:""; $("#f_section").value=t?t.section:(sectionsOf(tasks)[0]||"General");
-  setOwnerSeg(t?t.owner:"Deo");
+  const defOwner = t?t.owner:(memberList()[0]||"Shared");
+  buildOwnerSeg(t?t.owner:null); setOwnerSeg(defOwner);
   $("#f_w0").value=t?t.w0:cfg.now_week; $("#f_w1").value=t?t.w1:cfg.now_week;
   $("#f_comp").value=t?t.comp:0; $("#f_compVal").textContent=(t?t.comp:0)+"%";
   $("#f_est").value=t?t.est_hours:""; $("#f_log").value=t?t.logged_hours:"";
@@ -938,7 +1048,30 @@ function upsertLocal(saved){ const i=tasks.findIndex(x=>x.id===saved.id);
 
 /* ====================== SETTINGS ====================== */
 $("#settingsBtn").onclick=()=>{ modalOpen=true; $("#sErr").textContent=""; $("#s_old").value="";$("#s_new").value="";
-  $("#s_title").value=cfg.title; $("#s_sub").value=cfg.subtitle; $("#s_now").value=cfg.now_week; $("#setModal").classList.add("show"); };
+  $("#s_title").value=cfg.title; $("#s_sub").value=cfg.subtitle; $("#s_now").value=cfg.now_week;
+  renderSettingsMembers(); const sc=statusColors(); sc_done.value=sc.done; sc_behind.value=sc.behind; sc_progress.value=sc.progress; sc_next.value=sc.next;
+  $("#setModal").classList.add("show"); };
+function renderSettingsMembers(){
+  $("#s_members").innerHTML = memberList().map(n=>`<div class="memrow"><input class="bin nm" value="${esc(n)}" disabled><button class="smdel" type="button" data-mem="${esc(n)}">×</button></div>`).join("")
+    || `<div class="hint" style="margin:0">No members yet.</div>`;
+  document.querySelectorAll("#s_members .smdel").forEach(b=>b.onclick=()=>removeMember(b.dataset.mem));
+}
+async function addMemberSettings(){
+  const n=$("#s_newmem").value.trim(); if(!n) return;
+  $("#s_newmem").value=""; setSync("saving");
+  try{ await apiAddMember(n); cfg.members=[...memberList(),n]; renderSettingsMembers(); renderAll(); setSync("live"); toast("Member added"); }
+  catch(e){ setSync("off"); alert(err(e)); }
+}
+async function removeMember(n){
+  if(!confirm(`Remove ${n}? Their tasks stay but become unassigned.`)) return;
+  setSync("saving");
+  try{ await apiRemoveMember(n); cfg.members=memberList().filter(x=>x!==n); renderSettingsMembers(); renderAll(); setSync("live"); toast("Member removed"); }
+  catch(e){ setSync("off"); alert(err(e)); }
+}
+$("#s_addmem").onclick=addMemberSettings;
+$("#s_newmem").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addMemberSettings();}});
+$("#sColors").onclick=()=>{ localStorage.setItem("eh_status",JSON.stringify({done:sc_done.value,behind:sc_behind.value,progress:sc_progress.value,next:sc_next.value})); renderLegend(); renderGrid(); toast("Colors saved"); };
+$("#sColorsReset").onclick=()=>{ localStorage.removeItem("eh_status"); const sc=statusColors(); sc_done.value=sc.done; sc_behind.value=sc.behind; sc_progress.value=sc.progress; sc_next.value=sc.next; renderLegend(); renderGrid(); toast("Colors reset"); };
 function closeSet(){modalOpen=false;$("#setModal").classList.remove("show");}
 $("#sCancel").onclick=closeSet;
 $("#setModal").addEventListener("click",e=>{if(e.target.id==="setModal")closeSet();});
@@ -1206,7 +1339,73 @@ function exportMarkdown(){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   toast("Markdown exported");
 }
-$("#exportBtn").onclick=exportMarkdown;
+/* ---- PDF export: Progress timeline + budget ---- */
+function budgetHTML(){
+  const b=calcBudget(); let h='';
+  const tbl=(title,head,rows,tot)=>`<h3>${title}</h3><table class="bt"><thead><tr>${head.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows}${tot}</tbody></table>`;
+  let lr=(budget.labor||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>$${num(r.rate)}</td><td>${num(r.hrsA)}</td><td>${num(r.hrsE)}</td><td>${money(num(r.rate)*num(r.hrsA))}</td><td>${money(num(r.rate)*num(r.hrsE))}</td></tr>`).join('');
+  lr+=`<tr class="oh"><td>Labor overhead (${Math.round(b.loh*100)}%)</td><td></td><td></td><td></td><td>${money(b.TDLa-b.DLa)}</td><td>${money(b.TDLe-b.DLe)}</td></tr>`;
+  h+=tbl('Direct Labor',['Member','Rate','Hrs(A)','Hrs(E)','Actual','Estimate'],lr,`<tr class="tt"><td>Total Direct Labor</td><td></td><td></td><td></td><td>${money(b.TDLa)}</td><td>${money(b.TDLe)}</td></tr>`);
+  if((budget.contract||[]).length){ let cr=(budget.contract||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>$${num(r.rate)}</td><td>${num(r.hrsA)}</td><td>${num(r.hrsE)}</td><td>${money(num(r.rate)*num(r.hrsA))}</td><td>${money(num(r.rate)*num(r.hrsE))}</td></tr>`).join('');
+    h+=tbl('Contract Labor',['Item','Rate','Hrs(A)','Hrs(E)','Actual','Estimate'],cr,`<tr class="tt"><td>Total Contract Labor</td><td></td><td></td><td></td><td>${money(b.TCLa)}</td><td>${money(b.TCLe)}</td></tr>`); }
+  let mr=(budget.material||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${money(r.a)}</td><td>${money(r.e)}</td></tr>`).join('');
+  h+=tbl('Direct Materials',['Item','Actual','Estimate'],mr,`<tr class="tt"><td>Total Materials</td><td>${money(b.TDMa)}</td><td>${money(b.TDMe)}</td></tr>`);
+  h+=tbl('Totals',['','Actual','Estimate'],
+    `<tr><td>Subtotal</td><td>${money(b.subA)}</td><td>${money(b.subE)}</td></tr><tr class="oh"><td>Business overhead (${Math.round(b.boh*100)}%)</td><td>${money(b.bizA)}</td><td>${money(b.bizE)}</td></tr>`,
+    `<tr class="tt big"><td>Total Cost</td><td>${money(b.totalA)}</td><td>${money(b.totalE)}</td></tr>`);
+  return h;
+}
+function exportPDF(){
+  const c=cfg, n=NW();
+  const w=window.open("","_blank"); if(!w){ alert("Allow pop-ups to export the PDF."); return; }
+  const secs=[]; tasks.forEach(t=>{if(!secs.includes(t.section))secs.push(t.section);});
+  const hdr=cfg.weeks.map(wk=>`<th>${esc(wk.label)}<br><span class="r">${esc(wk.range)}</span></th>`).join('');
+  let rows='';
+  secs.forEach(sec=>{
+    rows+=`<tr class="srow"><td class="tn">${esc(sec)}</td><td colspan="${n}"></td></tr>`;
+    tasks.filter(t=>t.section===sec).forEach(t=>{
+      let cells='';
+      for(let wi=0;wi<n;wi++){ const inSpan=wi>=t.w0&&wi<=t.w1; cells+=`<td class="cc" style="background:${inSpan?weekStatus(t,wi):'transparent'}"></td>`; }
+      rows+=`<tr><td class="tn">${esc(t.name)}</td>${cells}</tr>`;
+    });
+  });
+  const sc=statusColors();
+  const leg=[["Done",sc.done],["Behind",sc.behind],["In progress",sc.progress],["Next",sc.next]].map(([l,col])=>`<span class="lg"><i style="background:${col}"></i>${l}</span>`).join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(c.title||'Project')} — Progress & Budget</title>
+  <style>@page{size:landscape;margin:12mm}body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#111;margin:0;padding:18px}
+  h1{font-size:20px;margin:0 0 2px}.sub{color:#666;font-size:12px;margin:0 0 12px}
+  .legend{margin:0 0 12px;font-size:11px}.lg{display:inline-flex;align-items:center;gap:5px;margin-right:14px}.lg i{width:12px;height:12px;border-radius:3px;display:inline-block}
+  table.gt{border-collapse:collapse;width:100%;table-layout:fixed;font-size:9px;margin-bottom:20px}
+  table.gt th,table.gt td{border:1px solid #d0d0d0;padding:2px}
+  table.gt th{background:#f3f4f6;font-size:8px;line-height:1.1}.gt th .r{color:#888;font-weight:400;font-size:7px}
+  table.gt td.tn{text-align:left;font-size:9px;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:5px}
+  table.gt td.cc{height:15px}.gt tr.srow td{background:#eceff3;font-weight:700;font-size:9px}
+  table.bt{border-collapse:collapse;width:60%;font-size:11px;margin:0 0 14px}h3{font-size:13px;margin:14px 0 5px}
+  table.bt th,table.bt td{border:1px solid #d8d8d8;padding:4px 8px;text-align:right}table.bt th{background:#f3f4f6}
+  table.bt td:first-child,table.bt th:first-child{text-align:left}.bt tr.tt td{font-weight:700;background:#fafafa}.bt tr.oh td{font-style:italic;color:#555}.bt tr.big td{font-size:13px}
+  </style></head><body>
+  <h1>${esc(c.title||'Project')}</h1><div class="sub">${esc(c.subtitle||'')}${(c.members&&c.members.length)?' · '+esc(c.members.join(', ')):''}</div>
+  <div class="legend">${leg}</div>
+  <table class="gt"><thead><tr><th class="tn">Task</th>${hdr}</tr></thead><tbody>${rows}</tbody></table>
+  <h2 style="font-size:16px;margin:6px 0">Budget</h2>${budgetHTML()}
+  <div style="color:#999;font-size:9px;margin-top:14px">Exported from Summer Timeline · ${new Date().toLocaleString()}</div>
+  </body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>{ w.print(); }, 500);
+  toast("Opening PDF…");
+}
+/* ---- export menu ---- */
+$("#exportBtn").onclick=(e)=>{
+  e.stopPropagation();
+  let menu=$("#exportMenu"); if(menu){ menu.remove(); return; }
+  menu=document.createElement("div"); menu.id="exportMenu"; menu.className="exmenu";
+  menu.innerHTML=`<button data-x="pdf">📄&nbsp; PDF — Progress + Budget</button><button data-x="md">📝&nbsp; Markdown — for Obsidian</button>`;
+  document.body.appendChild(menu);
+  const r=$("#exportBtn").getBoundingClientRect();
+  menu.style.top=(r.bottom+6)+"px"; menu.style.left=Math.min(r.left,innerWidth-250)+"px";
+  menu.querySelector('[data-x="pdf"]').onclick=()=>{menu.remove();exportPDF();};
+  menu.querySelector('[data-x="md"]').onclick=()=>{menu.remove();exportMarkdown();};
+  setTimeout(()=>document.addEventListener("click",function h(){const mn=$("#exportMenu");if(mn)mn.remove();document.removeEventListener("click",h);},{once:true}),0);
+};
 
 /* ====================== LOGIN BACKGROUND (Background Paths) ====================== */
 function buildBgPaths(){
