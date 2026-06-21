@@ -1142,8 +1142,9 @@ function calcBudget(){
   const TCLa=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsA),0), TCLe=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsE),0);
   const TDMa=M.reduce((s,r)=>s+num(r.a),0), TDMe=M.reduce((s,r)=>s+num(r.e),0);
   const days=projectDays();
-  // equipment rental = value × (rate% per day) × project days
-  const ETRMa=R.reduce((s,r)=>s+num(r.value)*(num(r.rate)/100)*days,0), ETRMe=ETRMa;
+  // equipment rental = value × (rate% per day) × project days — an ESTIMATE only;
+  // it is not part of "actual to date" (Direct + contract + materials + overhead spent so far)
+  const ETRMe=R.reduce((s,r)=>s+num(r.value)*(num(r.rate)/100)*days,0), ETRMa=0;
   const subA=TDLa+TCLa+TDMa+ETRMa, subE=TDLe+TCLe+TDMe+ETRMe, boh=num(b.bizOhRate);
   const bizA=subA*boh, bizE=subE*boh;
   return {DLa,DLe,TDLa,TDLe,TCLa,TCLe,TDMa,TDMe,ETRMa,ETRMe,subA,subE,bizA,bizE,totalA:subA+bizA,totalE:subE+bizE,loh,boh};
