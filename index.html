@@ -318,6 +318,46 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .about p{font-size:12.5px; line-height:1.55; color:var(--txt2); margin:11px 0 0}
 .about p b{color:var(--txt); font-weight:700}
 .about code{font-family:var(--mono); font-size:11.5px; background:var(--panel2); border:1px solid var(--line); padding:1px 5px; border-radius:5px; color:var(--txt)}
+
+/* ===== gate: tabs + register + passcode reveal ===== */
+.gtabs{display:flex; gap:4px; background:#eef1f6; border-radius:8px; padding:4px; margin:22px 0 18px}
+.gtab{flex:1; padding:8px; border-radius:6px; font-size:13px; font-weight:600; background:transparent; color:#64748b}
+.gtab.active{background:#fff; color:#1a202c; box-shadow:0 1px 3px rgba(0,0,0,.12)}
+#screen-register .notus-label{margin-top:13px}
+#screen-register .notus-label:first-child{margin-top:0}
+.rg2{display:flex; gap:10px}.rg2>div{flex:1}
+#rg_members{display:flex; flex-direction:column; gap:7px}
+.memrow{display:flex; gap:7px}
+.memrow input{flex:1}
+.memrow .memdel{flex:none; width:38px; border:1px solid #e2e8f0; background:#f8fafc; color:#94a3b8; border-radius:6px; font-size:16px}
+.memrow .memdel:hover{background:#fee2e2; color:#dc2626; border-color:#fecaca}
+.rg-addmem{margin-top:8px; width:100%; padding:9px; border:1px dashed #cbd5e0; background:#f8fafc; color:#475569; border-radius:6px; font-size:12.5px; font-weight:600}
+.rg-addmem:hover{border-color:#94a3b8; color:#1a202c}
+.pass-reveal{text-align:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:20px 16px; margin-bottom:16px}
+.pass-cap{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:700}
+.pass-code{font-size:26px; font-weight:700; color:#1a202c; letter-spacing:.06em; margin:10px 0 14px; word-break:break-all}
+.pass-copy{padding:8px 16px; border-radius:6px; border:1px solid #cbd5e0; background:#fff; color:#1a202c; font-weight:600; font-size:12.5px}
+.pass-copy:hover{background:#f1f5f9}
+.pass-copy.copied{background:#16a34a; color:#fff; border-color:#16a34a}
+.pass-warn{font-size:11.5px; color:#9a6b00; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:9px 11px; margin-top:14px; line-height:1.5}
+.pass-warn b{color:#7c4a00}
+
+/* ===== admin console ===== */
+#adminView h1{font-size:clamp(19px,2.4vw,25px)}
+#adminGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px}
+.agroup{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:16px 17px; box-shadow:var(--card-shadow); transition:box-shadow .2s, border-color .2s}
+.agroup:hover{box-shadow:var(--card-shadow-hover); border-color:var(--line-strong)}
+.agroup .cls{font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--deo)}
+.agroup .proj{font-size:16px; font-weight:700; margin:3px 0 2px}
+.agroup .meta{font-size:12px; color:var(--mut); margin-bottom:10px}
+.agroup .pbar{margin:0 0 12px}
+.agroup .arow{display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--txt2); margin-bottom:12px}
+.agroup .aacts{display:flex; gap:8px}
+.agroup .aacts button{flex:1; padding:8px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid var(--line-strong); background:var(--input-bg); color:var(--txt2)}
+.agroup .aacts button:hover{background:var(--panel2); color:var(--txt)}
+.agroup .aacts .areset:hover{background:color-mix(in srgb,var(--both) 16%,transparent); color:var(--both); border-color:var(--both)}
+.abanner{display:flex; align-items:center; gap:10px; background:color-mix(in srgb,var(--both) 12%,transparent); border:1px solid color-mix(in srgb,var(--both) 35%,transparent); color:var(--txt); border-radius:10px; padding:9px 14px; margin-bottom:14px; font-size:12.5px; font-weight:600}
+.abanner button{margin-left:auto; padding:6px 12px; border-radius:7px; border:1px solid var(--line-strong); background:var(--panel); color:var(--txt); font-size:12px; font-weight:600}
 </style>
 </head>
 <body>
@@ -331,14 +371,70 @@ button{font-family:var(--font); cursor:pointer; border:0}
         <h1>Summer Timeline</h1>
         <p>Project Gantt &amp; Budget</p>
       </div>
-      <div class="notus-divider"><span>Sign in with passcode</span></div>
-      <label class="notus-label" for="gatepass">Team passcode</label>
-      <input id="gatepass" class="notus-input" type="password" placeholder="Enter passcode" autocomplete="off" autofocus>
-      <div class="gateerr" id="gateerr"></div>
-      <button id="gatebtn" class="notus-btn">Sign In</button>
+      <div class="gtabs">
+        <button class="gtab active" data-screen="login" type="button">Sign in</button>
+        <button class="gtab" data-screen="register" type="button">New group</button>
+      </div>
+
+      <!-- LOGIN -->
+      <div class="gscreen" id="screen-login">
+        <label class="notus-label" for="gatepass">Passcode</label>
+        <input id="gatepass" class="notus-input" type="password" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autofocus>
+        <div class="gateerr" id="gateerr"></div>
+        <button id="gatebtn" class="notus-btn" type="button">Sign In</button>
+      </div>
+
+      <!-- REGISTER -->
+      <div class="gscreen" id="screen-register" style="display:none">
+        <label class="notus-label">Project lab (class)</label>
+        <select id="rg_class" class="notus-input"></select>
+        <input id="rg_newclass" class="notus-input" placeholder="New class name" style="display:none; margin-top:8px">
+        <div class="rg2">
+          <div><label class="notus-label">Semester</label><input id="rg_sem" class="notus-input" placeholder="e.g. Fall 2026"></div>
+          <div><label class="notus-label">Section</label><input id="rg_section" class="notus-input" placeholder="e.g. 001"></div>
+        </div>
+        <label class="notus-label">Project name</label>
+        <input id="rg_project" class="notus-input" placeholder="e.g. Line-Follower Robot">
+        <label class="notus-label">Group name / number</label>
+        <input id="rg_group" class="notus-input" placeholder="e.g. Group 3">
+        <div class="rg2">
+          <div><label class="notus-label">Start date</label><input id="rg_start" class="notus-input" type="date"></div>
+          <div><label class="notus-label">End date</label><input id="rg_end" class="notus-input" type="date"></div>
+        </div>
+        <label class="notus-label">Members</label>
+        <div id="rg_members"></div>
+        <button class="rg-addmem" id="rg_addmem" type="button">+ Add member</button>
+        <div class="gateerr" id="rgerr"></div>
+        <button id="rg_submit" class="notus-btn" type="button">Create workspace</button>
+      </div>
+
+      <!-- PASSCODE REVEAL -->
+      <div class="gscreen" id="screen-pass" style="display:none">
+        <div class="pass-reveal">
+          <div class="pass-cap">Your workspace passcode</div>
+          <div class="pass-code mono" id="pass-code">— — —</div>
+          <button class="pass-copy" id="pass-copy" type="button">Copy passcode</button>
+          <div class="pass-warn">⚠ Save this now — it is the only way into your workspace and <b>won't be shown again</b>. You can change it later in Settings.</div>
+        </div>
+        <button id="pass-enter" class="notus-btn" type="button">Enter workspace →</button>
+      </div>
     </div>
   </div>
-  <div class="notus-foot">Private workspace · for internal team use only</div>
+  <div class="notus-foot">Student project tracker · each group is private to its own passcode</div>
+</div>
+
+<!-- ============ ADMIN VIEW ============ -->
+<div class="wrap" id="adminView" style="display:none">
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></div>
+      <div class="ttl"><h1>Admin Console</h1><div class="sub" id="adminSub">All project groups</div></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="tbtn" id="adminThemeBtn" title="Toggle theme"></button>
+    <button class="tbtn" id="adminLogout"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out</button>
+  </div>
+  <div id="adminGrid"></div>
 </div>
 
 <!-- ============ APP ============ -->
@@ -439,14 +535,14 @@ button{font-family:var(--font); cursor:pointer; border:0}
   <div class="divider"></div>
   <details class="about">
     <summary>About Summer Timeline</summary>
-    <p><b>Summer Timeline</b> (a.k.a. <code>summer-ttu-gantt</code>) is the team's shared project tracker for building the
-    <b>Summer — TTU Campus AI Assistant</b>. It is the tool that tracks the build — not the assistant itself.</p>
-    <p>It answers, at a glance: <b>what</b> needs building (every task), <b>who</b> owns it (Deo = backend, Cannon = frontend),
-    <b>when</b> it happens and how far along it is (the weekly Gantt with completion % and hours), and <b>what it costs</b>
-    (the labor + materials + overhead budget, actual vs. estimate).</p>
-    <p>Two views: the <b>Timeline</b> (72 tasks across 9 sections over Jun–Aug 2026, with a live progress dashboard and a NOW marker)
-    and the <b>Budget</b> (auto-calculated cost model). It's <b>shared &amp; live</b> — everyone with the passcode sees the same data
-    and edits sync within seconds, kept private by passcode + database-level security.</p>
+    <p><b>Summer Timeline</b> is a shared project tracker for student project-lab groups. Each group registers, gets its own
+    private passcode, and tracks its project independently — no group can see another's data.</p>
+    <p>It answers, at a glance: <b>what</b> needs building (every task), <b>who</b> owns it, <b>when</b> it happens and how far
+    along it is (the weekly Gantt with completion % and hours), and <b>what it costs</b> (the labor + materials + overhead
+    budget, actual vs. estimate).</p>
+    <p>Two views: the <b>Timeline</b> (tasks across sections over your class schedule, with a live progress dashboard and a NOW
+    marker) and the <b>Budget</b> (auto-calculated cost model). It's <b>shared &amp; live</b> — everyone in your group with the
+    passcode sees the same data and edits sync within seconds, kept private by passcode + database-level security.</p>
   </details>
 </div></div>
 
@@ -468,6 +564,7 @@ let tasks = [];
 let editMode=false, editingId=null, modalOpen=false, lastSig="";
 let filterOwner="All", filterText="";
 let budget={}, curView="timeline";
+let isAdminMode=false, adminViewingGroup=false, memberRows=0;
 const $ = s=>document.querySelector(s);
 const esc = s=>(s+"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const NW = ()=>cfg.weeks.length;
@@ -482,22 +579,152 @@ async function apiSetNow(n){ return rpc("gantt_set_now",{p:PASS,n}); }
 async function apiSetMeta(t,s){ return rpc("gantt_set_meta",{p:PASS,new_title:t,new_subtitle:s}); }
 async function apiSetPass(o,n){ return rpc("gantt_set_passcode",{p_old:o,p_new:n}); }
 async function apiSetBudget(b){ return rpc("gantt_set_budget",{p:PASS,b}); }
+async function apiLogin(p){ return rpc("login",{p}); }
+async function apiListClasses(){ return rpc("list_classes",{}); }
+async function apiRegister(a){ return rpc("register_group",a); }
+async function apiAddMember(n){ return rpc("add_member",{p:PASS,member_name:n}); }
+async function apiRemoveMember(n){ return rpc("remove_member",{p:PASS,member_name:n}); }
+async function apiAdminOpen(p,gid){ return rpc("admin_open_group",{admin_p:p,gid}); }
+async function apiAdminReset(p,gid){ return rpc("admin_reset_passcode",{admin_p:p,gid}); }
 
 /* ====================== GATE ====================== */
 async function tryUnlock(p){
-  const btn=$("#gatebtn"); btn.disabled=true; btn.textContent="Unlocking…"; $("#gateerr").textContent="";
+  const btn=$("#gatebtn"); btn.disabled=true; btn.textContent="Signing in…"; $("#gateerr").textContent="";
   try{
-    PASS=p; const d=await apiLoad(); apply(d); PASS=p; sessionStorage.setItem("eh_pass",p);
-    $("#gate").style.display="none"; $("#app").style.display="";
-    startPolling();
+    PASS=p; const d=await apiLogin(p); sessionStorage.setItem("eh_pass",p);
+    $("#gate").style.display="none";
+    if(d.admin){ enterAdmin(d.groups); }
+    else { isAdminMode=false; apply(d); $("#app").style.display=""; startPolling(); }
   }catch(e){
     PASS=""; sessionStorage.removeItem("eh_pass");
     $("#gateerr").textContent = (e.code==="28000"||/unauthorized/i.test(e.message||"")) ? "Incorrect passcode." : "Connection error — try again.";
     $("#gatepass").select();
-  }finally{ btn.disabled=false; btn.textContent="Unlock"; }
+  }finally{ btn.disabled=false; btn.textContent="Sign In"; }
 }
 $("#gatebtn").onclick=()=>tryUnlock($("#gatepass").value.trim());
 $("#gatepass").addEventListener("keydown",e=>{if(e.key==="Enter")tryUnlock($("#gatepass").value.trim());});
+
+/* ---- gate tabs ---- */
+document.querySelectorAll(".gtab").forEach(t=>t.onclick=()=>{
+  const s=t.dataset.screen;
+  document.querySelectorAll(".gtab").forEach(x=>x.classList.toggle("active",x===t));
+  $("#screen-login").style.display = s==="login"?"":"none";
+  $("#screen-register").style.display = s==="register"?"":"none";
+  $("#screen-pass").style.display="none";
+  if(s==="register") initRegister();
+});
+
+/* ---- register flow ---- */
+let classesLoaded=false;
+async function initRegister(){
+  if($("#rg_members").children.length===0) addMemberRow(); // ensure at least one
+  if(classesLoaded) return;
+  try{
+    const cls=await apiListClasses();
+    $("#rg_class").innerHTML = cls.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")
+      + `<option value="__new__">+ Create new class…</option>`;
+    classesLoaded=true;
+  }catch(e){ $("#rgerr").textContent="Couldn't load classes — check connection."; }
+}
+$("#rg_class").addEventListener("change",e=>{
+  $("#rg_newclass").style.display = e.target.value==="__new__" ? "" : "none";
+});
+function addMemberRow(name){
+  if($("#rg_members").children.length>=12) return;
+  const row=document.createElement("div"); row.className="memrow";
+  row.innerHTML=`<input class="notus-input" placeholder="Member name" value="${esc(name||'')}"><button class="memdel" type="button" title="Remove">×</button>`;
+  row.querySelector(".memdel").onclick=()=>{ if($("#rg_members").children.length>1) row.remove(); };
+  $("#rg_members").appendChild(row);
+}
+$("#rg_addmem").onclick=()=>addMemberRow();
+$("#rg_submit").onclick=async()=>{
+  $("#rgerr").textContent="";
+  const classVal=$("#rg_class").value;
+  const isNew=classVal==="__new__";
+  const newName=$("#rg_newclass").value.trim();
+  const sem=$("#rg_sem").value.trim(), proj=$("#rg_project").value.trim();
+  const section=$("#rg_section").value.trim(), group=$("#rg_group").value.trim();
+  const start=$("#rg_start").value, end=$("#rg_end").value;
+  const members=[...$("#rg_members").querySelectorAll("input")].map(i=>i.value.trim()).filter(Boolean);
+  if(isNew && !newName){ $("#rgerr").textContent="Enter the new class name."; return; }
+  if(!proj){ $("#rgerr").textContent="Enter a project name."; return; }
+  if(!start||!end){ $("#rgerr").textContent="Enter start and end dates."; return; }
+  if(end<start){ $("#rgerr").textContent="End date must be after start date."; return; }
+  const btn=$("#rg_submit"); btn.disabled=true; btn.textContent="Creating…";
+  try{
+    const pw=await apiRegister({
+      p_class_id: isNew?null:+classVal, p_new_class_name: isNew?newName:null,
+      p_semester:sem, p_project_name:proj, p_section:section, p_group_label:group,
+      p_start:start, p_end:end, p_members:members
+    });
+    $("#pass-code").textContent=pw; window.__newpass=pw;
+    $("#screen-login").style.display="none"; $("#screen-register").style.display="none"; $("#screen-pass").style.display="";
+  }catch(e){ $("#rgerr").textContent=err(e); }
+  finally{ btn.disabled=false; btn.textContent="Create workspace"; }
+};
+$("#pass-copy").onclick=()=>{ navigator.clipboard.writeText(window.__newpass||"").then(()=>{
+  const b=$("#pass-copy"); b.classList.add("copied"); b.textContent="Copied ✓"; setTimeout(()=>{b.classList.remove("copied");b.textContent="Copy passcode";},1600);
+}); };
+$("#pass-enter").onclick=()=>{ $("#gatepass").value=window.__newpass||""; tryUnlock(window.__newpass||""); };
+
+/* ====================== ADMIN ====================== */
+function enterAdmin(groups){
+  isAdminMode=true; adminViewingGroup=false;
+  $("#app").style.display="none"; $("#adminView").style.display="";
+  renderAdmin(groups||[]);
+}
+function renderAdmin(groups){
+  $("#adminSub").textContent = `${groups.length} group${groups.length===1?'':'s'} across all project labs`;
+  $("#adminGrid").innerHTML = groups.length ? groups.map(g=>`
+    <div class="agroup">
+      <div class="cls">${esc(g.class_name||'')}</div>
+      <div class="proj">${esc(g.project_name||'Untitled project')}</div>
+      <div class="meta">${esc(g.semester||'')}${g.section?' · §'+esc(g.section):''}${g.group_label?' · '+esc(g.group_label):''}</div>
+      <div class="pbar"><i style="width:${g.progress||0}%"></i></div>
+      <div class="arow"><span>${g.progress||0}% · ${g.task_count||0} tasks</span><span>${(g.members||[]).length} member${(g.members||[]).length===1?'':'s'}</span></div>
+      <div class="aacts"><button data-open="${g.id}">View</button><button class="areset" data-reset="${g.id}" data-name="${esc(g.project_name||g.class_name||'')}">Reset passcode</button></div>
+    </div>`).join("") : `<div style="color:var(--mut);padding:30px">No groups have registered yet.</div>`;
+  $("#adminGrid").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>adminOpen(b.dataset.open));
+  $("#adminGrid").querySelectorAll("[data-reset]").forEach(b=>b.onclick=()=>adminReset(b.dataset.reset,b.dataset.name));
+}
+async function adminOpen(gid){
+  try{
+    const d=await apiAdminOpen(PASS,gid);
+    adminViewingGroup=true; apply(d);
+    $("#adminView").style.display="none"; $("#app").style.display="";
+    $("#editBtn").style.display="none"; $("#addBtn").style.display="none"; $("#settingsBtn").style.display="none"; $("#logoutBtn").style.display="none";
+    let bn=$("#adminBanner");
+    if(!bn){ bn=document.createElement("div"); bn.id="adminBanner"; bn.className="abanner"; $("#app").insertBefore(bn,$("#app").firstChild.nextSibling); }
+    bn.style.display="flex";
+    bn.innerHTML=`<span>👁 Admin view — read-only. Reset this group's passcode to edit it.</span><button id="adminBack">← Back to all groups</button>`;
+    $("#adminBack").onclick=backToAdmin;
+  }catch(e){ alert(err(e)); }
+}
+function backToAdmin(){
+  adminViewingGroup=false;
+  const bn=$("#adminBanner"); if(bn) bn.style.display="none";
+  $("#editBtn").style.display=""; $("#addBtn").style.display=""; $("#settingsBtn").style.display=""; $("#logoutBtn").style.display="";
+  $("#app").style.display="none"; $("#adminView").style.display="";
+  refreshAdmin();
+}
+async function refreshAdmin(){ try{ const d=await apiLogin(PASS); if(d.admin) renderAdmin(d.groups); }catch(e){} }
+async function adminReset(gid,name){
+  if(!confirm(`Reset the passcode for "${name}"? Their old passcode stops working immediately.`)) return;
+  try{ const pw=await apiAdminReset(PASS,gid);
+    prompt(`New passcode for "${name}" — copy and give it to the group (old one no longer works):`, pw);
+  }catch(e){ alert(err(e)); }
+}
+$("#adminLogout").onclick=()=>{ doLogout(); };
+$("#adminThemeBtn").onclick=()=>setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+function doLogout(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  PASS=""; sessionStorage.removeItem("eh_pass"); isAdminMode=false; adminViewingGroup=false; editMode=false; modalOpen=false;
+  $("#taskModal").classList.remove("show"); $("#setModal").classList.remove("show");
+  $("#app").style.display="none"; $("#adminView").style.display="none"; $("#gate").style.display="flex";
+  $("#gatepass").value=""; $("#gateerr").textContent=""; const bn=$("#adminBanner"); if(bn) bn.style.display="none";
+  $("#editBtn").style.display=""; $("#addBtn").style.display=""; $("#settingsBtn").style.display=""; $("#logoutBtn").style.display="";
+  $("#gatepass").focus();
+}
 
 /* ====================== DATA APPLY ====================== */
 function apply(d){
@@ -736,21 +963,15 @@ $("#editBtn").onclick=()=>{editMode=!editMode;const b=$("#editBtn");b.classList.
   b.innerHTML=editMode?'<svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Done':'<svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit';
   renderGrid(); renderBudget();};
 $("#addBtn").onclick=()=>openTask(null);
-$("#logoutBtn").onclick=()=>{
-  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
-  PASS=""; sessionStorage.removeItem("eh_pass");
-  editMode=false; modalOpen=false;
-  $("#taskModal").classList.remove("show"); $("#setModal").classList.remove("show");
-  $("#app").style.display="none"; $("#gate").style.display="flex";
-  $("#gatepass").value=""; $("#gateerr").textContent=""; $("#gatepass").focus();
-};
+$("#logoutBtn").onclick=()=>doLogout();
 $("#search").addEventListener("input",e=>{filterText=e.target.value.toLowerCase().trim();renderGrid();});
 
 /* ====================== THEME ====================== */
 function setTheme(t){document.documentElement.setAttribute("data-theme",t);localStorage.setItem("eh_theme",t);
-  $("#themeBtn").innerHTML = t==="dark"
+  const html = t==="dark"
     ? '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Light'
     : '<svg viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Dark';
+  $("#themeBtn").innerHTML = html; const at=$("#adminThemeBtn"); if(at) at.innerHTML = html;
   if(typeof placeOverlay==="function"&&$("#grid").children.length)placeOverlay();}
 $("#themeBtn").onclick=()=>setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
 setTheme(localStorage.getItem("eh_theme")||"dark");
