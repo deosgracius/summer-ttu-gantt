@@ -1129,7 +1129,11 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>setView(t.dataset.vie
 /* ====================== BUDGET ====================== */
 const num=x=>+x||0;
 const money=n=>"$"+(Math.round(num(n)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+/* a member's actual hours = sum of logged hours on their tasks (from the timeline) */
+function memberLogged(name){ return tasks.reduce((s,t)=> s + (ownerCanon(t.owner)===name ? (+t.logged_hours||0) : 0), 0); }
+function syncLaborHours(){ (budget.labor||[]).forEach(l=>{ if(memberList().includes(l.name)) l.hrsA = memberLogged(l.name); }); }
 function calcBudget(){
+  syncLaborHours();
   const b=budget, L=b.labor||[], C=b.contract||[], M=b.material||[], R=b.rental||[];
   const DLa=L.reduce((s,r)=>s+num(r.rate)*num(r.hrsA),0), DLe=L.reduce((s,r)=>s+num(r.rate)*num(r.hrsE),0);
   const loh=num(b.laborOhRate), TDLa=DLa*(1+loh), TDLe=DLe*(1+loh);
@@ -1182,10 +1186,15 @@ function renderBudget(){
   // ---- Direct Labor ----
   h+=`<div class="btable">${head("Direct Labor")}`;
   (budget.labor||[]).forEach((r,i)=>{
+    const isMem=memberList().includes(r.name);
     const a=num(r.rate)*num(r.hrsA), es=num(r.rate)*num(r.hrsE);
+    // actual hours come from the timeline (logged hours) for member lines — read-only
+    const actCell = (e && !isMem)
+      ? `${inp("labor",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`
+      : `${money(a)}<div class="sub">${num(r.hrsA)} hrs${isMem?' · from timeline':''}</div>`;
     h+=`<div class="brow"><div class="nm">${e?inp("labor",i,"name",r.name,"nm"):esc(r.name)}
         <span class="sub">${e?`$${inp("labor",i,"rate",r.rate)}/hr`:`$${num(r.rate)}/hr`}</span></div>
-      <div class="val act">${e?`${inp("labor",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`:`${money(a)}<div class="sub">${num(r.hrsA)} hrs</div>`}</div>
+      <div class="val act">${actCell}</div>
       <div class="val">${e?`${inp("labor",i,"hrsE",r.hrsE)} <small>hrs · ${money(es)}</small>${e?`<button class="bdel" data-del="labor" data-idx="${i}">×</button>`:""}`:`${money(es)}<div class="sub">${num(r.hrsE)} hrs</div>`}</div></div>`;
   });
   if(e) h+=`<div class="baddrow"><button class="badd" data-add="labor">+ Add labor line</button></div>`;
