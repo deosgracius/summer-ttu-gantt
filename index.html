@@ -311,6 +311,13 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .editpanel{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; font-size:12.5px; color:var(--mut)}
 .editpanel .ip{display:flex; align-items:center; gap:7px}
 .editpanel input{padding:6px 9px; border:1px solid var(--line-strong); border-radius:8px; background:var(--input-bg); color:var(--txt); font-size:12.5px; outline:none}
+.about summary{cursor:pointer; font-weight:700; font-size:14px; color:var(--txt); list-style:none; display:flex; align-items:center; gap:8px}
+.about summary::-webkit-details-marker{display:none}
+.about summary::before{content:"›"; font-size:18px; line-height:1; color:var(--mut); transition:transform .15s}
+.about[open] summary::before{transform:rotate(90deg)}
+.about p{font-size:12.5px; line-height:1.55; color:var(--txt2); margin:11px 0 0}
+.about p b{color:var(--txt); font-weight:700}
+.about code{font-family:var(--mono); font-size:11.5px; background:var(--panel2); border:1px solid var(--line); padding:1px 5px; border-radius:5px; color:var(--txt)}
 </style>
 </head>
 <body>
@@ -429,6 +436,18 @@ button{font-family:var(--font); cursor:pointer; border:0}
   </div>
   <div class="seterr" id="sErr"></div>
   <div class="acts2"><button class="btn-save" id="sPass">Update passcode</button></div>
+  <div class="divider"></div>
+  <details class="about">
+    <summary>About Summer Timeline</summary>
+    <p><b>Summer Timeline</b> (a.k.a. <code>summer-ttu-gantt</code>) is the team's shared project tracker for building the
+    <b>Summer — TTU Campus AI Assistant</b>. It is the tool that tracks the build — not the assistant itself.</p>
+    <p>It answers, at a glance: <b>what</b> needs building (every task), <b>who</b> owns it (Deo = backend, Cannon = frontend),
+    <b>when</b> it happens and how far along it is (the weekly Gantt with completion % and hours), and <b>what it costs</b>
+    (the labor + materials + overhead budget, actual vs. estimate).</p>
+    <p>Two views: the <b>Timeline</b> (72 tasks across 9 sections over Jun–Aug 2026, with a live progress dashboard and a NOW marker)
+    and the <b>Budget</b> (auto-calculated cost model). It's <b>shared &amp; live</b> — everyone with the passcode sees the same data
+    and edits sync within seconds, kept private by passcode + database-level security.</p>
+  </details>
 </div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
