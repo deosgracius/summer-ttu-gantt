@@ -448,6 +448,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
     <span class="sync" id="sync"><span class="dot"></span><span id="syncTxt">Live</span></span>
     <button class="tbtn" id="themeBtn" title="Toggle theme"></button>
     <button class="tbtn" id="settingsBtn" title="Settings"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.6"/></svg> Settings</button>
+    <button class="tbtn" id="exportBtn" title="Export to Markdown (for Obsidian)"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
     <button class="tbtn" id="editBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit</button>
     <button class="tbtn" id="logoutBtn" title="Sign out"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out</button>
     <button class="tbtn primary" id="addBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Add task</button>
@@ -1131,6 +1132,81 @@ function saveBudget(){ setSync("saving"); clearTimeout(budgetSaveT); budgetSaveT
   try{ await apiSetBudget(budget); cfg.budget=budget; setSync("live"); toast("Budget saved"); }
   catch(err2){ setSync("off"); }
 },600); }
+
+/* ====================== EXPORT TO MARKDOWN (Obsidian) ====================== */
+function mdEsc(s){ return (s+"").replace(/\|/g,"\\|").replace(/\r?\n/g," "); }
+function exportMarkdown(){
+  const c=cfg, total=tasks.length, done=tasks.filter(t=>t.comp>=100).length;
+  const avg=total?Math.round(tasks.reduce((s,t)=>s+t.comp,0)/total):0;
+  const estH=tasks.reduce((s,t)=>s+t.est_hours,0), logH=tasks.reduce((s,t)=>s+t.logged_hours,0);
+  const nw=c.now_week||0, tw=(c.weeks||[]).length||1;
+  const expected=Math.round(Math.min(1,(nw+1)/tw)*100), onTrack=avg>=expected-8;
+  const wkLabel=i=>(c.weeks&&c.weeks[i]&&c.weeks[i].label)||("W"+((+i||0)+1));
+  const members=c.members||[];
+  const b=calcBudget();
+  const yaml=v=>JSON.stringify(v??"");
+  let m="---\n";
+  m+=`title: ${yaml((c.title||"Project")+(c.project_name?" — "+c.project_name:""))}\n`;
+  m+=`class: ${yaml(c.class_name||c.title||"")}\n`;
+  m+=`semester: ${yaml(c.semester||"")}\n`;
+  m+=`project: ${yaml(c.project_name||"")}\n`;
+  m+=`section: ${yaml(c.section||"")}\n`;
+  m+=`group: ${yaml(c.group_label||"")}\n`;
+  m+=`start: ${c.start_date||""}\n`;
+  m+=`end: ${c.end_date||""}\n`;
+  m+=`generated: ${new Date().toISOString().slice(0,10)}\n`;
+  m+=`tags: [summer-timeline, project-lab]\n`;
+  m+="---\n\n";
+  m+=`# ${c.title||"Project Timeline"}\n${c.subtitle||""}\n\n`;
+  m+=`## Progress\n`;
+  m+=`- **Overall:** ${avg}% (${done}/${total} tasks complete)\n`;
+  m+=`- **Schedule:** Week ${nw+1} of ${tw} — ${onTrack?"On track":"Behind"} (target ~${expected}%)\n`;
+  m+=`- **Hours:** ${fmtH(logH)} / ${fmtH(estH)} logged\n`;
+  if(members.length) m+=`- **Members:** ${members.join(", ")}\n`;
+  m+=`\n## Timeline\n\n`;
+  const secs=[]; tasks.forEach(t=>{ if(!secs.includes(t.section)) secs.push(t.section); });
+  secs.forEach(sec=>{
+    const items=tasks.filter(t=>t.section===sec);
+    const sp=items.length?Math.round(items.reduce((s,t)=>s+t.comp,0)/items.length):0;
+    m+=`### ${sec} — ${sp}%\n\n`;
+    m+=`| Task | Owner | Weeks | % | Hours (log/est) |\n|---|---|---|---|---|\n`;
+    items.forEach(t=>{
+      const wk=t.w0===t.w1?wkLabel(t.w0):`${wkLabel(t.w0)}→${wkLabel(t.w1)}`;
+      m+=`| ${t.comp>=100?"✅ ":""}${mdEsc(t.name)} | ${mdEsc(t.owner)} | ${wk} | ${t.comp}% | ${fmtH(t.logged_hours)}/${fmtH(t.est_hours)} |\n`;
+    });
+    m+="\n";
+  });
+  m+=`## Budget\n\n`;
+  m+=`### Direct Labor\n\n| Member | Rate | Hrs (A) | Hrs (E) | Actual | Estimate |\n|---|---|---|---|---|---|\n`;
+  (budget.labor||[]).forEach(r=>{ m+=`| ${mdEsc(r.name)} | $${num(r.rate)} | ${num(r.hrsA)} | ${num(r.hrsE)} | ${money(num(r.rate)*num(r.hrsA))} | ${money(num(r.rate)*num(r.hrsE))} |\n`; });
+  m+=`| _Labor overhead (${Math.round(b.loh*100)}%)_ |  |  |  | ${money(b.TDLa-b.DLa)} | ${money(b.TDLe-b.DLe)} |\n`;
+  m+=`| **Total Direct Labor** |  |  |  | **${money(b.TDLa)}** | **${money(b.TDLe)}** |\n\n`;
+  if((budget.contract||[]).length){
+    m+=`### Contract Labor\n\n| Item | Rate | Hrs (A) | Hrs (E) | Actual | Estimate |\n|---|---|---|---|---|---|\n`;
+    (budget.contract||[]).forEach(r=>{ m+=`| ${mdEsc(r.name)} | $${num(r.rate)} | ${num(r.hrsA)} | ${num(r.hrsE)} | ${money(num(r.rate)*num(r.hrsA))} | ${money(num(r.rate)*num(r.hrsE))} |\n`; });
+    m+=`| **Total Contract Labor** |  |  |  | **${money(b.TCLa)}** | **${money(b.TCLe)}** |\n\n`;
+  }
+  m+=`### Direct Materials\n\n| Item | Actual | Estimate |\n|---|---|---|\n`;
+  (budget.material||[]).forEach(r=>{ m+=`| ${mdEsc(r.name)} | ${money(r.a)} | ${money(r.e)} |\n`; });
+  m+=`| **Total Materials** | **${money(b.TDMa)}** | **${money(b.TDMe)}** |\n\n`;
+  if((budget.rental||[]).length){
+    m+=`### Equipment Rental\n\n| Item | Actual | Estimate |\n|---|---|---|\n`;
+    (budget.rental||[]).forEach(r=>{ m+=`| ${mdEsc(r.name||"—")} | ${money(num(r.value)*num(r.rate))} | ${money(num(r.value)*num(r.rate))} |\n`; });
+    m+=`| **Total Rental** | **${money(b.ETRMa)}** | **${money(b.ETRMe)}** |\n\n`;
+  }
+  m+=`### Totals\n\n| | Actual | Estimate |\n|---|---|---|\n`;
+  m+=`| Subtotal (TDL + TCL + TDM + ETRM) | ${money(b.subA)} | ${money(b.subE)} |\n`;
+  m+=`| Business overhead (${Math.round(b.boh*100)}%) | ${money(b.bizA)} | ${money(b.bizE)} |\n`;
+  m+=`| **Total Cost** | **${money(b.totalA)}** | **${money(b.totalE)}** |\n\n`;
+  m+=`---\n*Exported from Summer Timeline · ${location.host||"summer-ttu-gantt.fly.dev"} · ${new Date().toLocaleString()}*\n`;
+  let fname=((c.title||"project")+"-"+(c.project_name||"")).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+  if(!fname) fname="timeline";
+  const blob=new Blob([m],{type:"text/markdown;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname+".md";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast("Markdown exported");
+}
+$("#exportBtn").onclick=exportMarkdown;
 
 /* ====================== LOGIN BACKGROUND (Background Paths) ====================== */
 function buildBgPaths(){
