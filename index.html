@@ -395,6 +395,12 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .blimit{font-size:11.5px; margin-top:9px; padding:7px 11px; border-radius:9px; border:1px solid var(--line)}
 .blimit.ok{background:color-mix(in srgb,var(--ok) 10%,transparent); color:var(--ok)}
 .blimit.over{background:color-mix(in srgb,var(--bad) 12%,transparent); color:var(--bad); font-weight:600}
+.auditrows{max-height:55vh; overflow:auto; margin:6px 0}
+.arow2{display:flex; gap:11px; padding:9px 4px; border-bottom:1px solid var(--grid-line); align-items:flex-start}
+.arow2 .ai{font-size:15px; flex:none; width:20px; text-align:center}
+.arow2 .aa{font-size:13px; color:var(--txt); text-transform:capitalize}
+.arow2 .aa b{font-weight:700}
+.arow2 .ad{font-size:11px; color:var(--mut); margin-top:1px}
 </style>
 </head>
 <body>
@@ -441,6 +447,8 @@ button{font-family:var(--font); cursor:pointer; border:0}
         <label class="notus-label">Members</label>
         <div id="rg_members"></div>
         <button class="rg-addmem" id="rg_addmem" type="button">+ Add member</button>
+        <label class="notus-label">Registration code <span style="text-transform:none;color:#94a3b8">(if your instructor gave one)</span></label>
+        <input id="rg_code" class="notus-input" placeholder="Leave blank if not required" autocomplete="off">
         <div class="gateerr" id="rgerr"></div>
         <button id="rg_submit" class="notus-btn" type="button">Create workspace</button>
       </div>
@@ -468,17 +476,35 @@ button{font-family:var(--font); cursor:pointer; border:0}
       <div class="ttl"><h1>Admin Console</h1><div class="sub" id="adminSub">All project groups</div></div>
     </div>
     <div class="spacer"></div>
+    <button class="tbtn" id="adminRegCode" title="Registration code">🔑 Reg code</button>
+    <button class="tbtn" id="adminExportAll" title="Export all groups as CSV">⬇ Export CSV</button>
+    <button class="tbtn" id="adminAudit" title="Audit log">📜 Audit log</button>
     <button class="tbtn" id="adminThemeBtn" title="Toggle theme"></button>
     <button class="tbtn" id="adminLogout"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out</button>
   </div>
   <div id="adminGrid"></div>
 </div>
 
+<!-- ============ AUDIT LOG MODAL ============ -->
+<div class="modal" id="auditModal"><div class="sheet">
+  <h3>Audit log</h3>
+  <p class="hint">Recent administrative & registration activity.</p>
+  <div id="auditList"></div>
+  <div class="acts2"><button class="btn-ghost" id="auditClose" type="button">Close</button></div>
+</div></div>
+
 <!-- ============ ADMIN MANAGE MODAL ============ -->
 <div class="modal" id="adminModal"><div class="sheet">
   <h3 id="amTitle">Manage group</h3>
   <p class="hint" id="amSub"></p>
   <div id="amStatus"></div>
+  <div class="divider"></div>
+  <h3 style="font-size:15px">Group details</h3>
+  <div class="field"><label>Project name</label><input id="am_proj" class="bin nm"></div>
+  <div class="row2"><div class="field"><label>Semester</label><input id="am_sem" class="bin nm"></div>
+    <div class="field"><label>Section</label><input id="am_sec" class="bin nm"></div></div>
+  <div class="field"><label>Group name / number</label><input id="am_grp" class="bin nm"></div>
+  <div class="acts2"><button class="btn-save" id="am_savedetails" type="button">Save details</button></div>
   <div class="divider"></div>
   <h3 style="font-size:15px">Members</h3>
   <div id="am_members"></div>
@@ -676,6 +702,9 @@ async function apiAdminRemoveMember(p,gid,name){ return rpc("admin_remove_member
 async function apiAdminDeleteGroup(p,gid){ return rpc("admin_delete_group",{admin_p:p,gid}); }
 async function apiAdminSuspend(p,gid,susp){ return rpc("admin_suspend_group",{admin_p:p,gid,susp}); }
 async function apiAdminSetLimit(p,gid,lim){ return rpc("admin_set_budget_limit",{admin_p:p,gid,lim}); }
+async function apiAdminUpdateGroup(p,gid,proj,sem,sec,grp){ return rpc("admin_update_group",{admin_p:p,gid,p_proj:proj,p_sem:sem,p_sec:sec,p_grp:grp}); }
+async function apiAdminAudit(p,lim){ return rpc("admin_audit_log",{admin_p:p,lim}); }
+async function apiAdminSetRegCode(p,code){ return rpc("admin_set_reg_code",{admin_p:p,code}); }
 
 /* ====================== GATE ====================== */
 async function tryUnlock(p){
@@ -683,7 +712,7 @@ async function tryUnlock(p){
   try{
     PASS=p; const d=await apiLogin(p); sessionStorage.setItem("eh_pass",p);
     $("#gate").style.display="none";
-    if(d.admin){ enterAdmin(d.groups); }
+    if(d.admin){ adminRegCodeVal=d.reg_code||""; enterAdmin(d.groups); }
     else { isAdminMode=false; apply(d); $("#app").style.display=""; startPolling(); }
   }catch(e){
     PASS=""; sessionStorage.removeItem("eh_pass");
@@ -747,7 +776,7 @@ $("#rg_submit").onclick=async()=>{
     const pw=await apiRegister({
       p_class_id: isNew?null:+classVal, p_new_class_name: isNew?newName:null,
       p_semester:sem, p_project_name:proj, p_section:section, p_group_label:group,
-      p_start:start, p_end:end, p_members:members
+      p_start:start, p_end:end, p_members:members, p_reg_code:$("#rg_code").value.trim()
     });
     $("#pass-code").textContent=pw; window.__newpass=pw;
     $("#screen-login").style.display="none"; $("#screen-register").style.display="none"; $("#screen-pass").style.display="";
@@ -780,13 +809,14 @@ function renderAdmin(groups){
   $("#adminGrid").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>adminOpen(b.dataset.open));
   $("#adminGrid").querySelectorAll("[data-manage]").forEach(b=>b.onclick=()=>adminManage(b.dataset.manage));
 }
-let adminGroups=[], amGid=null;
+let adminGroups=[], amGid=null, adminRegCodeVal="";
 function adminManage(gid){
   const g=adminGroups.find(x=>x.id===gid); if(!g) return;
   amGid=gid; modalOpen=true; $("#amErr").textContent="";
   $("#amTitle").textContent=g.project_name||g.class_name||"Group";
   $("#amSub").textContent=`${g.class_name||''} · ${g.semester||''}${g.section?' · §'+g.section:''}${g.group_label?' · '+g.group_label:''}`;
   $("#amStatus").innerHTML = g.suspended ? `<div class="abanner" style="margin:0">⛔ This group is suspended — members cannot sign in.</div>` : "";
+  $("#am_proj").value=g.project_name||""; $("#am_sem").value=g.semester||""; $("#am_sec").value=g.section||""; $("#am_grp").value=g.group_label||"";
   $("#am_limit").value = g.budget_limit||"";
   $("#am_suspend").textContent = g.suspended ? "Un-suspend" : "Suspend";
   renderAmMembers(g.members||[]);
@@ -808,6 +838,39 @@ $("#am_passcode").onclick=async()=>{ try{ const pw=await apiAdminReset(PASS,amGi
 $("#am_suspend").onclick=()=>{ const g=adminGroups.find(x=>x.id===amGid)||{}; amDo(()=>apiAdminSuspend(PASS,amGid,!g.suspended), g.suspended?"Group un-suspended":"Group suspended"); };
 $("#am_delete").onclick=async()=>{ const g=adminGroups.find(x=>x.id===amGid)||{}; if(!confirm(`Permanently delete "${g.project_name||g.class_name||''}" and all its tasks? This cannot be undone.`))return;
   try{ await apiAdminDeleteGroup(PASS,amGid); modalOpen=false; $("#adminModal").classList.remove("show"); const d=await apiLogin(PASS); if(d.admin) renderAdmin(d.groups); toast("Group deleted"); }catch(e){ $("#amErr").textContent=err(e); } };
+$("#am_savedetails").onclick=()=>amDo(()=>apiAdminUpdateGroup(PASS,amGid,$("#am_proj").value.trim(),$("#am_sem").value.trim(),$("#am_sec").value.trim(),$("#am_grp").value.trim()),"Details saved");
+
+/* ---- audit log ---- */
+$("#adminAudit").onclick=async()=>{
+  $("#auditList").innerHTML=`<div class="hint">Loading…</div>`; $("#auditModal").classList.add("show"); modalOpen=true;
+  try{ const rows=await apiAdminAudit(PASS,200);
+    const icon={register:"🆕",delete_group:"🗑",suspend:"⛔",unsuspend:"✅",add_member:"➕",remove_member:"➖",reset_passcode:"🔑",budget_limit:"💰",edit_group:"✏️",reg_code_set:"🔐"};
+    $("#auditList").innerHTML = rows.length ? `<div class="auditrows">`+rows.map(r=>`<div class="arow2"><span class="ai">${icon[r.action]||"•"}</span><div><div class="aa">${esc(r.action.replace(/_/g,' '))}${r.group_name?` · <b>${esc(r.group_name)}</b>`:""}</div><div class="ad">${r.detail?esc(r.detail)+" · ":""}${new Date(r.at).toLocaleString()}</div></div></div>`).join("")+`</div>` : `<div class="hint">No activity yet.</div>`;
+  }catch(e){ $("#auditList").innerHTML=`<div class="seterr">${esc(err(e))}</div>`; }
+};
+$("#auditClose").onclick=()=>{ modalOpen=false; $("#auditModal").classList.remove("show"); };
+$("#auditModal").addEventListener("click",e=>{ if(e.target.id==="auditModal"){ modalOpen=false; $("#auditModal").classList.remove("show"); }});
+
+/* ---- bulk export all groups (CSV) ---- */
+$("#adminExportAll").onclick=()=>{
+  const cols=["class_name","project_name","semester","section","group_label","progress","task_count","members","suspended","budget_limit","start_date","end_date","created_at"];
+  const head=["Class","Project","Semester","Section","Group","Progress %","Tasks","Members","Suspended","Budget cap","Start","End","Registered"];
+  const cell=v=>{ v=(v==null?"":Array.isArray(v)?v.join("; "):v)+""; return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const rows=adminGroups.map(g=>cols.map(c=>cell(g[c])).join(","));
+  const csv=[head.join(","),...rows].join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="summer-timeline-groups-"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); toast("Exported "+adminGroups.length+" groups");
+};
+
+/* ---- registration code ---- */
+$("#adminRegCode").onclick=async()=>{
+  const cur=adminRegCodeVal||"";
+  const v=prompt("Registration code students must enter to create a workspace.\nLeave blank to allow open registration.", cur);
+  if(v===null) return;
+  try{ await apiAdminSetRegCode(PASS, v.trim()); adminRegCodeVal=v.trim(); toast(v.trim()?("Registration code set: "+v.trim()):"Registration is now open"); }
+  catch(e){ alert(err(e)); }
+};
 async function adminOpen(gid){
   try{
     const d=await apiAdminOpen(PASS,gid);
