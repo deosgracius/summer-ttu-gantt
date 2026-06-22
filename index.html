@@ -415,6 +415,38 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .arow2 .aa b{font-weight:700}
 .arow2 .ad{font-size:11px; color:var(--mut); margin-top:1px}
 .sec .secico{font-size:13px; line-height:1; margin-right:1px}
+
+/* ===== help assistant ===== */
+#helpFab{position:fixed; right:22px; bottom:22px; z-index:140; width:54px; height:54px; border-radius:50%;
+  background:var(--accent-grad); color:#fff; box-shadow:0 10px 26px color-mix(in srgb,var(--can) 40%,transparent), 0 2px 8px rgba(0,0,0,.25);
+  display:grid; place-items:center; transition:transform .18s, box-shadow .18s}
+#helpFab:hover{transform:translateY(-2px) scale(1.04)}
+#helpFab svg{width:26px;height:26px}
+#helpPanel{position:fixed; right:22px; bottom:88px; z-index:141; width:min(380px,calc(100vw - 32px)); height:min(560px,calc(100vh - 130px));
+  background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:18px; box-shadow:var(--card-shadow-hover);
+  display:none; flex-direction:column; overflow:hidden; animation:rise .22s cubic-bezier(.2,.8,.2,1)}
+#helpPanel.show{display:flex}
+.hp-head{display:flex; align-items:center; justify-content:space-between; padding:13px 16px; background:var(--accent-grad); color:#fff}
+.hp-title{font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px}
+.hp-dot{width:8px;height:8px;border-radius:50%;background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.3)}
+.hp-head button{background:rgba(255,255,255,.18); color:#fff; width:26px;height:26px;border-radius:7px; font-size:13px}
+.hp-head button:hover{background:rgba(255,255,255,.3)}
+.hp-msgs{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px}
+.hp-b{max-width:86%; padding:10px 13px; border-radius:14px; font-size:13px; line-height:1.5}
+.hp-b.bot{align-self:flex-start; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-bottom-left-radius:5px}
+.hp-b.me{align-self:flex-end; background:var(--primary); color:var(--primary-fg); border-bottom-right-radius:5px}
+.hp-b b{font-weight:700}
+.hp-b .hk{font-family:var(--mono); font-size:11.5px; background:var(--panel-solid); border:1px solid var(--line); padding:1px 5px; border-radius:5px}
+.hp-b ul{margin:6px 0 0; padding-left:18px} .hp-b li{margin:2px 0}
+.hp-sug{display:flex; gap:7px; flex-wrap:wrap; padding:0 14px 10px}
+.hp-chip{font-size:11.5px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--txt2); transition:.15s}
+.hp-chip:hover{border-color:var(--deo); color:var(--txt)}
+.hp-input{display:flex; gap:8px; padding:11px 12px; border-top:1px solid var(--line); background:var(--panel)}
+.hp-input input{flex:1; border:1px solid var(--line-strong); background:var(--input-bg); color:var(--txt); border-radius:10px; padding:10px 12px; font-size:13px; outline:none; font-family:var(--font)}
+.hp-input input:focus{border-color:var(--deo)}
+.hp-input button{flex:none; width:40px; border-radius:10px; background:var(--accent-grad); color:#fff; display:grid; place-items:center}
+.hp-input button svg{width:18px;height:18px}
+@media (max-width:640px){#helpPanel{right:12px; left:12px; width:auto}}
 </style>
 </head>
 <body>
@@ -585,6 +617,21 @@ button{font-family:var(--font); cursor:pointer; border:0}
 
 <div id="tip"></div>
 <div class="toast" id="toast"></div>
+
+<!-- ============ HELP ASSISTANT (free, offline) ============ -->
+<button id="helpFab" title="Help" aria-label="Help assistant">
+  <svg viewBox="0 0 24 24" fill="none"><path d="M9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4M12 17h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.6"/></svg>
+</button>
+<div id="helpPanel">
+  <div class="hp-head">
+    <div class="hp-title"><span class="hp-dot"></span> Help Assistant</div>
+    <button id="hpClose" aria-label="Close">✕</button>
+  </div>
+  <div class="hp-msgs" id="hpMsgs"></div>
+  <div class="hp-sug" id="hpSug"></div>
+  <div class="hp-input"><input id="hpInput" placeholder="Ask how to do anything…" autocomplete="off">
+    <button id="hpSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+</div>
 
 <!-- ============ TASK MODAL ============ -->
 <div class="modal" id="taskModal"><div class="sheet">
@@ -1627,6 +1674,102 @@ function buildBgPaths(){
   }
   el.innerHTML=`<svg viewBox="0 0 696 316" fill="none" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">${p}</svg>`;
 }
+
+/* ====================== HELP ASSISTANT (free, offline) ====================== */
+const HELP_KB=[
+ {k:["what is","about","what does this","purpose","help"],t:"What this app is",
+  a:"<b>Summer Timeline</b> is a shared tracker for project-lab groups: a weekly <b>Gantt timeline</b> and a <b>Budget</b>. Each group logs in with its own passcode and sees only its project. Use the tabs up top to switch between <b>Timeline</b> and <b>Budget</b>."},
+ {k:["register","new group","sign up","create a group","create workspace","start a project"],t:"Register a new group",
+  a:"On the login screen pick the <b>New group</b> tab → choose your class (or create one), enter semester, project name, section, group, start/end dates and members → <b>Create workspace</b>. You'll get a one-time <b>passcode</b> — save it! If your instructor set a registration code, enter it too."},
+ {k:["sign in","log in","login","enter passcode"],t:"Signing in",
+  a:"On the <b>Sign in</b> tab, type your group's <b>passcode</b> and press <b>Sign In</b>. Several people can be signed in at the same time with the same passcode."},
+ {k:["forgot","lost passcode","forgot passcode","can't log in","lost password"],t:"Forgot passcode",
+  a:"Passcodes can't be recovered (they're stored hashed). Ask your <b>instructor/admin</b> — they can reset your group's passcode and give you a new one."},
+ {k:["change passcode","new passcode","update passcode"],t:"Change your passcode",
+  a:"Open <b>Settings</b> (gear, top-right) → <b>Change passcode</b> → enter the current one and a new one (min 4 characters)."},
+ {k:["two views","detailed","progress view","switch view","color view","gantt view"],t:"Timeline views",
+  a:"Toggle (top-left) between <b>Detailed</b> — bars with % and owner colors — and <b>Progress</b> — a status grid: 🟢 done, 🔴 behind, 🟡 in progress, 🔵 next. You can recolor the statuses in Settings."},
+ {k:["add task","new task","create task"],t:"Add a task",
+  a:"Click <b>+ Add task</b> (top-right). Fill in name, section, owner, start/end week, completion %, and hours, then <b>Save</b>."},
+ {k:["edit task","change task","update task"],t:"Edit a task",
+  a:"Turn on <b>Edit</b> (top-right), then click a task's bar or its ✎ icon to open and change it."},
+ {k:["delete task","remove task"],t:"Delete a task",
+  a:"Turn on <b>Edit</b>, then click the <b>×</b> next to the task name (or open the task and press <b>Delete</b>)."},
+ {k:["reorder","move task","drag","move up","move down","rearrange"],t:"Reorder tasks",
+  a:"Turn on <b>Edit</b>, then grab the <span class='hk'>⠿</span> handle on a task and drag it up/down. Dropping it in another section moves it there."},
+ {k:["log hours","logged hours","enter hours","add hours","time spent","track hours","my hours"],t:"Log your hours",
+  a:"Open a task (in <b>Edit</b> mode) and set its <b>Logged hours</b>. They roll up automatically into the dashboard <b>Hours logged</b> and your line in the budget's <b>Direct Labor</b>."},
+ {k:["completion","percent","progress %","% done","mark done","complete"],t:"Set completion %",
+  a:"Open a task and drag the <b>Completion</b> slider. 100% marks the bar done (and turns it green in the Progress view)."},
+ {k:["owner","assign","assign task","who does","member to task"],t:"Assign an owner",
+  a:"Open a task and pick an <b>Owner</b> — your members plus <b>Shared</b>. Each member has a color; use the chips to filter by member."},
+ {k:["add member","remove member","members","add people","team member"],t:"Manage members",
+  a:"Open <b>Settings</b> → <b>Members</b> to add/remove members. Adding one also creates their <b>Direct Labor</b> line in the budget."},
+ {k:["hours logged","how many hours","expected hours","total hours","hours formula"],t:"Hours logged formula",
+  a:"The <b>Hours logged</b> card = total of all members' logged hours over <b>weeks × 12 × members</b> (12 = expected lab hours per student per week). It rises as members log time."},
+ {k:["budget","cost","money","expenses","spend"],t:"Budget overview",
+  a:"The <b>Budget</b> tab shows <b>Actual vs Estimate</b> for Direct Labor, Contract Labor, Materials, Equipment Rental, plus overhead — all auto-calculated. Turn on <b>Edit</b> to change rates, costs and overhead."},
+ {k:["direct labor","labor cost","labor rate","hourly rate","wage"],t:"Direct Labor",
+  a:"A member's <b>actual</b> labor = their logged hours × hourly rate, plus <b>100% overhead</b>. Rates: Robotic $15, others $18, Capstone $25. Estimated hours default to 12 × weeks per member."},
+ {k:["fix hours","wrong hours","correct hours","override","mistake in hours"],t:"Fix labor hours",
+  a:"In the <b>Budget</b> (Edit mode) you can type into a member's <b>actual hours</b> to correct a mistake — it overrides the timeline total. The <span class='hk'>↻</span> button resets it back to the timeline sum."},
+ {k:["materials","parts","supplies"],t:"Materials",
+  a:"<b>Direct Materials</b> are charged at purchase price. Edit the Actual/Estimate columns, or add lines with <b>+ Add material line</b>."},
+ {k:["equipment","rental","oscilloscope","per day","0.2"],t:"Equipment rental",
+  a:"Equipment is charged <b>0.2% of its value per day</b> × the project's days. Enter each item's value and rate; the rental cost computes automatically (counts toward the <b>estimate</b>)."},
+ {k:["overhead","markup"],t:"Overhead",
+  a:"Labor gets a <b>100% overhead</b> on wages. A separate business-overhead % sits on the Project Total row (0% by default for labs)."},
+ {k:["actual to date","spent so far"],t:"Actual to date",
+  a:"<b>Actual to date</b> = Direct Labor + Contract + Materials + overhead spent so far. <b>Total estimate</b> is the full planned cost including equipment."},
+ {k:["budget limit","cap","over budget"],t:"Budget limit",
+  a:"An admin can set a <b>budget cap</b>. If your total estimate goes over it, the Budget shows a red over-limit warning."},
+ {k:["export","pdf","download","print","markdown","obsidian"],t:"Export",
+  a:"Click <b>Export</b> (top-right) → <b>PDF</b> (Progress timeline + full budget) or <b>Markdown</b> (for Obsidian/notes)."},
+ {k:["csv","export all","spreadsheet"],t:"Export CSV (admin)",
+  a:"Admins can click <b>Export CSV</b> in the admin console for a roster of all groups (class, project, members, progress, cap, dates)."},
+ {k:["colors","status color","customize color","change color"],t:"Customize Progress colors",
+  a:"Open <b>Settings</b> → <b>Progress view colors</b> to choose your own Done / Behind / In progress / Next colors."},
+ {k:["theme","dark","light","dark mode","night"],t:"Switch theme",
+  a:"Click the <b>Light/Dark</b> button (top-right) to toggle the theme — your choice is remembered."},
+ {k:["now","current week","marker","today"],t:"The NOW marker",
+  a:"The green <b>NOW</b> line marks the current week (auto-set from your dates). Adjust it in Settings → Current week."},
+ {k:["title","subtitle","rename","project name"],t:"Edit title",
+  a:"Open <b>Settings</b> to edit the project <b>title</b> and <b>subtitle</b>. Admins can rename a group's project/semester/section from the console."},
+ {k:["sign out","log out","logout"],t:"Sign out",
+  a:"Click <b>Sign out</b> (top-right). You return to the login screen; your data stays saved."},
+ {k:["sync","live","real time","same time","collaborate","shared"],t:"Live sync",
+  a:"Everything is <b>shared & live</b> — anyone in your group with the passcode sees the same data, and edits sync within a few seconds."},
+ {k:["admin","manage groups","suspend","governance","audit","registration code"],t:"Admin controls",
+  a:"Sign in with the <b>admin passcode</b> for the console: view any group, manage members, reset passcodes, set budget limits, suspend, delete, rename, see the <b>audit log</b>, export CSV, and set a <b>registration code</b>."},
+ {k:["section","sections","categories"],t:"Sections",
+  a:"Tasks are grouped into <b>sections</b> (Setup, Design, Development, Testing, Deliverables…), each with its own progress and icon. Add a task to a new section just by typing a new section name."},
+ {k:["search","filter","find task"],t:"Search & filter",
+  a:"Use the <b>Search</b> box to find tasks by name, and the owner <b>chips</b> to filter by member or Shared."},
+];
+const HP_STARTERS=["How do I add a task?","How do I log my hours?","How does the budget work?","Register a new group","Forgot my passcode","Export to PDF","Switch to dark mode"];
+let helpStarted=false;
+function helpMatch(q){
+  q=" "+(q||"").toLowerCase().replace(/[^a-z0-9 %]/g," ")+" ";
+  let best=null,bs=0;
+  HELP_KB.forEach(e=>{ let s=0; e.k.forEach(kw=>{ if(q.includes(" "+kw+" ")||q.includes(kw)) s+=kw.split(" ").length; }); if(s>bs){bs=s;best=e;} });
+  return bs>=1?best:null;
+}
+function hpAdd(html,who){ const d=document.createElement("div"); d.className="hp-b "+who; d.innerHTML=html; $("#hpMsgs").appendChild(d); $("#hpMsgs").scrollTop=$("#hpMsgs").scrollHeight; }
+function hpSuggest(list){ $("#hpSug").innerHTML=list.map(t=>`<button class="hp-chip">${esc(t)}</button>`).join("");
+  document.querySelectorAll("#hpSug .hp-chip").forEach(b=>b.onclick=()=>hpAsk(b.textContent)); }
+function hpAsk(q){ q=(q||"").trim(); if(!q) return; hpAdd(esc(q),"me"); $("#hpInput").value="";
+  const e=helpMatch(q);
+  setTimeout(()=>{ if(e) hpAdd(`<b>${esc(e.t)}</b><br>${e.a}`,"bot");
+    else hpAdd("I'm not sure about that one — try rephrasing, or pick a topic below:","bot");
+    hpSuggest(HP_STARTERS.slice(0,5)); }, 130);
+}
+function openHelp(){ $("#helpPanel").classList.add("show");
+  if(!helpStarted){ helpStarted=true; hpAdd("👋 Hi! I'm the Help Assistant. Ask me how to do anything in Summer Timeline — or tap a question below.","bot"); hpSuggest(HP_STARTERS); }
+  setTimeout(()=>$("#hpInput").focus(),50); }
+$("#helpFab").onclick=()=>{ const p=$("#helpPanel"); if(p.classList.contains("show")) p.classList.remove("show"); else openHelp(); };
+$("#hpClose").onclick=()=>$("#helpPanel").classList.remove("show");
+$("#hpSend").onclick=()=>hpAsk($("#hpInput").value);
+$("#hpInput").addEventListener("keydown",e=>{ if(e.key==="Enter") hpAsk($("#hpInput").value); });
 
 /* ====================== BOOT ====================== */
 if(PASS){ tryUnlock(PASS); } else { $("#gatepass").focus(); }
