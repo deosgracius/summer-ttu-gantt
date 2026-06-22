@@ -438,6 +438,10 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .hp-b b{font-weight:700}
 .hp-b .hk{font-family:var(--mono); font-size:11.5px; background:var(--panel-solid); border:1px solid var(--line); padding:1px 5px; border-radius:5px}
 .hp-b ul{margin:6px 0 0; padding-left:18px} .hp-b li{margin:2px 0}
+.hp-fb{display:flex; align-items:center; gap:6px; margin-top:9px; padding-top:8px; border-top:1px solid var(--line); font-size:11px; color:var(--mut)}
+.hp-fbb{width:26px; height:24px; border-radius:6px; background:var(--panel-solid); border:1px solid var(--line); font-size:12px; line-height:1}
+.hp-fbb:hover{border-color:var(--deo); transform:translateY(-1px)}
+.hp-fbok{font-size:11.5px; color:var(--ok); font-weight:600}
 .hp-sug{display:flex; gap:7px; flex-wrap:wrap; padding:0 14px 10px}
 .hp-chip{font-size:11.5px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--txt2); transition:.15s}
 .hp-chip:hover{border-color:var(--deo); color:var(--txt)}
@@ -1869,23 +1873,38 @@ function hpNorm(s){ return (s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").spli
   .filter(w=>w&&!HP_STOP.has(w)).map(w=>HP_SYN[w]||w); }
 HELP_KB.forEach(e=>{ const set=new Set(); e.k.forEach(kw=>hpNorm(kw).forEach(t=>set.add(t))); hpNorm(e.t).forEach(t=>set.add(t)); e._tok=set; });
 const HP_DF={}; HELP_KB.forEach(e=>e._tok.forEach(t=>{HP_DF[t]=(HP_DF[t]||0)+1;}));  // how many topics use each token
-function helpMatch(q){
+function helpRank(q){
   const raw=" "+(q||"").toLowerCase().replace(/[^a-z0-9 %]/g," ")+" ";
-  const qt=hpNorm(q); let best=null,bs=0;
-  HELP_KB.forEach(e=>{ let s=0;
-    e.k.forEach(kw=>{ if(kw.indexOf(" ")>=0 && raw.indexOf(" "+kw+" ")>=0) s+=3; });   // exact phrase bonus
-    qt.forEach(t=>{ if(e._tok.has(t)) s+= 1/(HP_DF[t]||1); });                          // rarer/more specific tokens weigh more
-    if(s>bs){ bs=s; best=e; } });
-  return bs>=0.24?best:null;
+  const qt=hpNorm(q);
+  return HELP_KB.map(e=>{ let s=0;
+    e.k.forEach(kw=>{ if(kw.indexOf(" ")>=0 && raw.indexOf(" "+kw+" ")>=0) s+=3; });
+    qt.forEach(t=>{ if(e._tok.has(t)) s+= 1/(HP_DF[t]||1); });
+    return {e,s}; }).sort((a,b)=>b.s-a.s);
 }
-function hpAdd(html,who){ const d=document.createElement("div"); d.className="hp-b "+who; d.innerHTML=html; $("#hpMsgs").appendChild(d); $("#hpMsgs").scrollTop=$("#hpMsgs").scrollHeight; }
+function helpMatch(q){ const r=helpRank(q)[0]; return (r&&r.s>=0.24)?r.e:null; }
+function hpAdd(html,who){ const d=document.createElement("div"); d.className="hp-b "+who; d.innerHTML=html; $("#hpMsgs").appendChild(d); $("#hpMsgs").scrollTop=$("#hpMsgs").scrollHeight; return d; }
 function hpSuggest(list){ $("#hpSug").innerHTML=list.map(t=>`<button class="hp-chip">${esc(t)}</button>`).join("");
   document.querySelectorAll("#hpSug .hp-chip").forEach(b=>b.onclick=()=>hpAsk(b.textContent)); }
+function hpAnswer(e){
+  const d=hpAdd(`<b>${esc(e.t)}</b><br>${e.a}<div class="hp-fb"><span>Was this helpful?</span><button class="hp-fbb" data-fb="up" aria-label="Yes, helpful">👍</button><button class="hp-fbb" data-fb="down" aria-label="No, not helpful">👎</button></div>`,"bot");
+  d.querySelectorAll("[data-fb]").forEach(b=>b.onclick=()=>{ const fb=d.querySelector(".hp-fb");
+    if(b.dataset.fb==="up"){ fb.innerHTML="<span class='hp-fbok'>Thanks! 🙌</span>"; }
+    else { fb.innerHTML="<span class='hp-fbok'>Sorry about that.</span>"; hpAdd("No problem — try wording it differently, or pick one of these:","bot"); hpSuggest(HP_STARTERS.slice(0,5)); }
+  });
+}
 function hpAsk(q){ q=(q||"").trim(); if(!q) return; hpAdd(esc(q),"me"); $("#hpInput").value="";
-  const e=helpMatch(q);
-  setTimeout(()=>{ if(e) hpAdd(`<b>${esc(e.t)}</b><br>${e.a}`,"bot");
-    else hpAdd("I'm not sure about that one — try rephrasing, or pick a topic below:","bot");
-    hpSuggest(HP_STARTERS.slice(0,5)); }, 130);
+  const ranked=helpRank(q), top=ranked[0];
+  setTimeout(()=>{
+    if(top && top.s>=0.24){
+      hpAnswer(top.e);
+      const next=ranked.filter(r=>r.e!==top.e && r.s>=Math.max(0.15, top.s*0.5)).slice(0,3).map(r=>r.e.t);  // genuinely-related follow-ups
+      hpSuggest(next.length?next:HP_STARTERS.slice(0,4));
+    } else {
+      const close=ranked.filter(r=>r.s>=0.12).slice(0,3).map(r=>r.e.t);               // near-misses, if any
+      hpAdd(close.length?"I'm not sure — did you mean one of these?":"I couldn't find that. Here are some things I can help with:","bot");
+      hpSuggest(close.length?close:HP_STARTERS.slice(0,5));
+    }
+  },130);
 }
 function openHelp(){ $("#helpPanel").classList.add("show");
   if(!helpStarted){ helpStarted=true; hpAdd("👋 Hi! I'm the Help Assistant. Ask me how to do anything in Summer Timeline — or tap a question below.","bot"); hpSuggest(HP_STARTERS); }
