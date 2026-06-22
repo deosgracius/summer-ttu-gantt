@@ -181,7 +181,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .wk .r{color:var(--mut); font-size:9.5px; margin-top:1px}
 .wk.isnow .l{color:var(--ok)}
 .namecell{position:sticky; left:0; z-index:5; background:var(--panel-solid); border-right:1px solid var(--line-strong);
-  padding:8px 13px; font-size:12.5px; display:flex; align-items:center; gap:9px; min-width:264px; max-width:264px}
+  padding:8px 13px; font-size:12.5px; display:flex; align-items:center; gap:9px; min-width:0; overflow:hidden}
 .namecell .d{width:9px;height:9px;border-radius:50%; flex:none}
 .namecell .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .gh.namecell{font-weight:500; font-size:11px; letter-spacing:.03em; text-transform:uppercase; color:var(--mut)}
@@ -267,7 +267,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
   border:1px solid var(--line-strong); border-radius:12px; padding:11px 18px; font-size:13px; font-weight:600; box-shadow:var(--card-shadow);
   opacity:0; transition:.3s; z-index:300; pointer-events:none}
 .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
-@media (max-width:640px){.namecell{min-width:170px;max-width:170px}.legend{display:none}}
+@media (max-width:640px){.legend{display:none}}
 
 /* ============ TABS ============ */
 .tabs{display:flex; gap:4px; margin-bottom:18px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:4px; width:fit-content}
@@ -447,6 +447,38 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .hp-input button{flex:none; width:40px; border-radius:10px; background:var(--accent-grad); color:#fff; display:grid; place-items:center}
 .hp-input button svg{width:18px;height:18px}
 @media (max-width:640px){#helpPanel{right:12px; left:12px; width:auto}}
+
+/* ===== accessibility ===== */
+:focus-visible{outline:2.5px solid var(--deo); outline-offset:2px; border-radius:6px}
+button:focus-visible,.tbtn:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2.5px solid var(--deo); outline-offset:2px}
+input:focus-visible,select:focus-visible{outline:none}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important; animation-iteration-count:1!important; transition-duration:.001ms!important; scroll-behavior:auto!important}
+}
+
+/* ===== mobile / touch ===== */
+@media (max-width:600px){
+  .wrap{padding:16px 12px 80px}
+  .topbar{gap:7px; row-gap:8px}
+  .brand{flex:1 1 100%}
+  .brand .sub{white-space:normal}
+  .topbar .tbtn{padding:9px 11px; font-size:12px}
+  .topbar .tbtn svg{width:16px;height:16px}
+  .sync{order:-1}
+  .tabs{width:100%} .tab{flex:1; justify-content:center}
+  .controls{gap:8px}
+  .search input{width:100%}
+  .chip{padding:8px 12px}            /* bigger tap targets */
+  .tbtn,.btn-save,.btn-ghost,.btn-del,.vtab,.gtab{min-height:42px}
+  .mini{width:30px;height:30px;font-size:14px}
+  .modal{padding:10px; align-items:flex-end}
+  .sheet{width:100%; max-height:88vh; border-radius:18px 18px 12px 12px}
+  #helpFab{right:16px; bottom:16px; width:50px; height:50px}
+  #helpPanel{bottom:78px}
+  .bdash{grid-template-columns:1fr}
+}
+@media (hover:none){ .bar:hover{transform:none} .card:hover{transform:none} }
 </style>
 </head>
 <body>
@@ -532,7 +564,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
 </div>
 
 <!-- ============ AUDIT LOG MODAL ============ -->
-<div class="modal" id="auditModal"><div class="sheet">
+<div class="modal" id="auditModal"><div class="sheet" role="dialog" aria-modal="true">
   <h3>Audit log</h3>
   <p class="hint">Recent administrative & registration activity.</p>
   <div id="auditList"></div>
@@ -540,7 +572,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
 </div></div>
 
 <!-- ============ ADMIN MANAGE MODAL ============ -->
-<div class="modal" id="adminModal"><div class="sheet">
+<div class="modal" id="adminModal"><div class="sheet" role="dialog" aria-modal="true">
   <h3 id="amTitle">Manage group</h3>
   <p class="hint" id="amSub"></p>
   <div id="amStatus"></div>
@@ -634,7 +666,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
 </div>
 
 <!-- ============ TASK MODAL ============ -->
-<div class="modal" id="taskModal"><div class="sheet">
+<div class="modal" id="taskModal"><div class="sheet" role="dialog" aria-modal="true">
   <h3 id="tmTitle">Edit task</h3>
   <p class="hint">Changes save to the shared timeline for everyone.</p>
   <div class="field"><label>Task name</label><input id="f_name" placeholder="e.g. Booking endpoints"></div>
@@ -662,7 +694,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
 </div></div>
 
 <!-- ============ SETTINGS MODAL ============ -->
-<div class="modal" id="setModal"><div class="sheet">
+<div class="modal" id="setModal"><div class="sheet" role="dialog" aria-modal="true">
   <h3>Settings</h3>
   <p class="hint">Shared across the whole team.</p>
   <div class="field"><label>Project title</label><input id="s_title"></div>
@@ -1050,7 +1082,7 @@ function animateCounts(){
     const key=el.dataset.key||"_", to=+el.dataset.count||0, dec=el.dataset.dec==="1";
     const from=(_counts[key]==null?0:_counts[key]);
     const fmt=v=>dec?fmtH(Math.round(v*10)/10):Math.round(v);
-    if(from===to){ el.textContent=fmt(to); _counts[key]=to; return; }
+    if(from===to || matchMedia("(prefers-reduced-motion: reduce)").matches){ el.textContent=fmt(to); _counts[key]=to; return; }
     const t0=performance.now(), dur=650;
     _counts[key]=to;
     setTimeout(()=>{ el.textContent=fmt(to); }, dur+250);   // safety: land final value even if frames throttle
@@ -1071,7 +1103,9 @@ function renderChips(){
 }
 
 /* ====================== RENDER: GANTT ====================== */
-const NAMEW=264, COLW=124;
+let NAMEW=264, COLW=124;
+function gridDims(){ const w=innerWidth;
+  if(w<=560){ NAMEW=128; COLW=80; } else if(w<=860){ NAMEW=184; COLW=104; } else { NAMEW=264; COLW=124; } }
 function visibleTasks(){
   return tasks.filter(t=>(filterOwner==="All"||ownerCanon(t.owner)===filterOwner) &&
     (!filterText || (t.name+" "+t.section).toLowerCase().includes(filterText)));
@@ -1095,6 +1129,7 @@ function weekStatus(t,w){ const sc=statusColors();
   return sc.next;
 }
 function renderGrid(){
+  gridDims();
   const grid=$("#grid"), n=NW(); const progress = timelineView==="progress";
   grid.style.gridTemplateColumns=NAMEW+"px repeat("+n+","+COLW+"px)";
   let h='<div class="gh namecell">Task</div>';
@@ -1107,7 +1142,7 @@ function renderGrid(){
     h+=`<div class="sec"><span class="secico">${sectionIcon(sec)}</span><span>${esc(sec)}</span><span class="cnt mono">${items.length}</span><div class="secbar"><i style="width:${sp}%"></i></div><span class="cnt mono">${sp}%</span></div>`;
     items.forEach(t=>{
       h+=`<div class="namecell"${editMode?` draggable="true" data-drag="${t.id}"`:''}>${editMode?'<span class="drag">⠿</span>':''}<span class="d" style="background:${ownerColor(t.owner)}"></span><span class="nm" title="${esc(t.name)} · ${esc(ownerLabel(t.owner))}">${esc(t.name)}</span>
-        <span class="acts"><button class="mini" data-edit="${t.id}">✎</button><button class="mini del" data-del="${t.id}">×</button></span></div>`;
+        <span class="acts"><button class="mini" data-edit="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">✎</button><button class="mini del" data-del="${t.id}" aria-label="Delete ${esc(t.name)}" title="Delete">×</button></span></div>`;
       if(progress){
         let cells='';
         for(let w=t.w0; w<=t.w1 && w<n; w++){
@@ -1334,8 +1369,16 @@ setTheme(localStorage.getItem("eh_theme")||"dark");
 /* ====================== UTIL ====================== */
 function err(e){ if(e&&(e.code==="28000"||/unauthorized/i.test(e.message||"")))return "Session expired — refresh and re-enter passcode."; return (e&&e.message)||"Something went wrong."; }
 let toastT; function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove("show"),2000);}
-window.addEventListener("resize",()=>{if($("#grid").children.length)placeOverlay();});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if($("#taskModal").classList.contains("show"))closeTask();if($("#setModal").classList.contains("show"))closeSet();}});
+let _rsT; window.addEventListener("resize",()=>{ clearTimeout(_rsT); _rsT=setTimeout(()=>{
+  if($("#grid")&&$("#grid").children.length){ const pw=NAMEW+"|"+COLW; gridDims(); if(NAMEW+"|"+COLW!==pw) renderGrid(); else placeOverlay(); }
+},160); });
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){
+  if($("#taskModal").classList.contains("show"))closeTask();
+  if($("#setModal").classList.contains("show"))closeSet();
+  ["adminModal","auditModal"].forEach(id=>{const m=$("#"+id); if(m&&m.classList.contains("show")){m.classList.remove("show");modalOpen=false;}});
+  if($("#helpPanel").classList.contains("show"))$("#helpPanel").classList.remove("show");
+  const em=$("#exportMenu"); if(em)em.remove();
+}});
 
 /* ====================== TABS ====================== */
 function setView(v){ curView=v;
