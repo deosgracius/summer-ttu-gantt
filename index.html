@@ -1021,6 +1021,13 @@ function doLogout(){
 function apply(d){
   cfg = d.config || cfg;
   budget = (cfg.budget && Object.keys(cfg.budget).length) ? cfg.budget : defaultBudget();
+  budget.today = liveToday();
+  // Keep the "now" marker on the true current week based on today's date
+  const _ps = budget.start ? new Date(budget.start+"T00:00:00") : null;
+  if(_ps && !isNaN(_ps) && (cfg.weeks||[]).length){
+    const _wk = Math.floor((Date.now() - _ps.getTime())/(7*86400000));
+    cfg.now_week = Math.max(0, Math.min(cfg.weeks.length-1, _wk));
+  }
   tasks = (d.tasks||[]).map(t=>({...t, comp:+t.comp||0, w0:+t.w0||0, w1:+t.w1||0, est_hours:+t.est_hours||0, logged_hours:+t.logged_hours||0, sort_order:+t.sort_order||0}));
   lastSig = JSON.stringify(d);
   $("#appTitle").textContent = cfg.title || "Software Engineering Lab";
@@ -1448,7 +1455,8 @@ function calcBudget(){
   return {DLa,DLe,TDLa,TDLe,TCLa,TCLe,TDMa,TDMe,ETRMa,ETRMe,subA,subE,bizA,bizE,totalA:subA+bizA,totalE:subE+bizE,loh,boh};
 }
 function projectDays(){ const s=new Date(budget.start),e=new Date(budget.end); if(isNaN(s)||isNaN(e)||e<s) return 1; return Math.max(1,Math.round((e-s)/86400000)); }
-function timePct(){ const s=new Date(budget.start),t=new Date(budget.today),e=new Date(budget.end);
+function liveToday(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function timePct(){ const s=new Date(budget.start),t=new Date(),e=new Date(budget.end);
   if(isNaN(s)||isNaN(e)||e<=s) return 0; return Math.max(0,Math.min(100,(t-s)/(e-s)*100)); }
 function fmtDate(d){ const x=new Date(d); return isNaN(x)?"—":x.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
 
@@ -1457,6 +1465,7 @@ function numCell(sec,idx,field,val,cls){ return editMode? inp(sec,idx,field,val,
 
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
+  budget.today = liveToday();
   const c=calcBudget(), pct=timePct();
   const spent= c.totalE? Math.min(100,Math.round(c.totalA/c.totalE*100)):0;
   const e=editMode;
@@ -1480,7 +1489,7 @@ function renderBudget(){
   if(e) h+=`<div class="editpanel">
      <span style="font-weight:700;color:var(--txt2)">Dates:</span>
      <span class="ip">Start ${inp("root",-1,"start",budget.start)}</span>
-     <span class="ip">Today ${inp("root",-1,"today",budget.today)}</span>
+     <span class="ip" style="opacity:.7">Today <b style="font-weight:700">${fmtDate(liveToday())}</b> <small style="color:var(--txt2)">(auto)</small></span>
      <span class="ip">End ${inp("root",-1,"end",budget.end)}</span>
    </div>`;
 
