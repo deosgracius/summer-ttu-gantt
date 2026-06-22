@@ -1456,9 +1456,11 @@ function calcBudget(){
 }
 function projectDays(){ const s=new Date(budget.start),e=new Date(budget.end); if(isNaN(s)||isNaN(e)||e<s) return 1; return Math.max(1,Math.round((e-s)/86400000)); }
 function liveToday(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-function timePct(){ const s=new Date(budget.start),t=new Date(),e=new Date(budget.end);
+// Parse a YYYY-MM-DD string as a LOCAL date (avoid JS's UTC-midnight off-by-one)
+function pDate(d){ if(typeof d==="string"){ const m=d.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]); } return new Date(d); }
+function timePct(){ const s=pDate(budget.start),t=new Date(),e=pDate(budget.end);
   if(isNaN(s)||isNaN(e)||e<=s) return 0; return Math.max(0,Math.min(100,(t-s)/(e-s)*100)); }
-function fmtDate(d){ const x=new Date(d); return isNaN(x)?"—":x.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
+function fmtDate(d){ const x=pDate(d); return isNaN(x)?"—":x.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
 
 function inp(sec,idx,field,val,cls){ return `<input class="bin ${cls||''}" data-sec="${sec}" data-idx="${idx}" data-field="${field}" value="${esc(val)}">`; }
 function numCell(sec,idx,field,val,cls){ return editMode? inp(sec,idx,field,val,cls) : `<span class="${cls||''}">${esc(val)}</span>`; }
