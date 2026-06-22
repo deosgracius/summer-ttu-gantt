@@ -1757,7 +1757,7 @@ const HELP_KB=[
   a:"On the <b>Sign in</b> tab, type your group's <b>passcode</b> and press <b>Sign In</b>. Several people can be signed in at the same time with the same passcode."},
  {k:["forgot","lost passcode","forgot passcode","can't log in","lost password"],t:"Forgot passcode",
   a:"Passcodes can't be recovered (they're stored hashed). Ask your <b>instructor/admin</b> — they can reset your group's passcode and give you a new one."},
- {k:["change passcode","new passcode","update passcode"],t:"Change your passcode",
+ {k:["change passcode","new passcode","update passcode","reset passcode","reset code","reset my code","reset"],t:"Change your passcode",
   a:"Open <b>Settings</b> (gear, top-right) → <b>Change passcode</b> → enter the current one and a new one (min 4 characters)."},
  {k:["two views","detailed","progress view","switch view","color view","gantt view"],t:"Timeline views",
   a:"Toggle (top-left) between <b>Detailed</b> — bars with % and owner colors — and <b>Progress</b> — a status grid: 🟢 done, 🔴 behind, 🟡 in progress, 🔵 next. You can recolor the statuses in Settings."},
@@ -1809,7 +1809,7 @@ const HELP_KB=[
   a:"Open <b>Settings</b> to edit the project <b>title</b> and <b>subtitle</b>. Admins can rename a group's project/semester/section from the console."},
  {k:["sign out","log out","logout"],t:"Sign out",
   a:"Click <b>Sign out</b> (top-right). You return to the login screen; your data stays saved."},
- {k:["sync","live","real time","same time","collaborate","shared"],t:"Live sync",
+ {k:["sync","live","real time"],t:"Live sync",
   a:"Everything is <b>shared & live</b> — anyone in your group with the passcode sees the same data, and edits sync within a few seconds."},
  {k:["admin","manage groups","suspend","governance","audit","registration code"],t:"Admin controls",
   a:"Sign in with the <b>admin passcode</b> for the console: view any group, manage members, reset passcodes, set budget limits, suspend, delete, rename, see the <b>audit log</b>, export CSV, and set a <b>registration code</b>."},
@@ -1817,14 +1817,66 @@ const HELP_KB=[
   a:"Tasks are grouped into <b>sections</b> (Setup, Design, Development, Testing, Deliverables…), each with its own progress and icon. Add a task to a new section just by typing a new section name."},
  {k:["search","filter","find task"],t:"Search & filter",
   a:"Use the <b>Search</b> box to find tasks by name, and the owner <b>chips</b> to filter by member or Shared."},
+ {k:["shared","what is shared","both","group task","everyone","team task"],t:"What \"Shared\" means",
+  a:"<b>Shared</b> is for tasks the whole group does together (no single owner) — planning, presentations, the demo, etc. They show in amber and aren't counted toward one member's hours."},
+ {k:["can't see member tasks","member has no tasks","member empty","no tasks for member","assign tasks to member","member not showing tasks"],t:"A member has no tasks",
+  a:"New groups start with tasks split between the first two members; extra members begin with none. Just open a task in <b>Edit</b> mode and set its <b>Owner</b> to that member — they'll then appear in the Detailed view and the By-owner card."},
+ {k:["hours wrong","wrong hours","hours look wrong","hours incorrect","hours don't match","budget hours wrong"],t:"My hours look wrong",
+  a:"Each member's hours come from the <b>Logged hours</b> on their tasks. Fix the task on the timeline, or in the <b>Budget</b> (Edit mode) type directly into that member's <b>actual hours</b> to override — the <span class='hk'>↻</span> button restores the timeline total."},
+ {k:["save automatically","does it save","autosave","do i need to save","lose my work","is my data saved"],t:"Does it save automatically?",
+  a:"Yes — every change saves to the shared database instantly (watch the <b>Live</b> indicator). There's no save button. If it ever shows <b>Offline</b>, your last change may not have saved — try again when it's back to Live."},
+ {k:["same time","multiple people","at once","others editing","everyone edit","concurrent","work together"],t:"Can several people edit at once?",
+  a:"Yes. Anyone in your group with the passcode can be signed in at the same time; edits sync for everyone within a few seconds."},
+ {k:["demo","demo day","presentation","presentations","final report","interim report","deliverable","deliverables"],t:"Deliverables & presentations",
+  a:"New groups get a weekly <b>Presentation</b> deliverable plus <b>Demo Day</b> on the last week and a <b>Final Report</b> — all in the Deliverables section. Edit their weeks/owners like any task."},
+ {k:["who is behind","falling behind","behind schedule","on track","red tasks","status colors meaning"],t:"See who's behind",
+  a:"Switch the timeline to the <b>Progress</b> view: 🟢 done, 🔴 behind (week passed, not done), 🟡 in progress, 🔵 upcoming. The <b>Schedule</b> card also shows an On-track / Behind badge for the whole project."},
 ];
 const HP_STARTERS=["How do I add a task?","How do I log my hours?","How does the budget work?","Register a new group","Forgot my passcode","Export to PDF","Switch to dark mode"];
 let helpStarted=false;
+/* ---- synonym-aware token matching (still 100% offline) ---- */
+const HP_STOP=new Set("a an the to of in on at for and or is are be do does did how can could would should will i me my we our you your it this that with what when where which who why on off into get got make made please help want need use using able do new there here project app summer some any will go s too total".split(" "));
+const HP_SYN={ remove:"delete",erase:"delete",rid:"delete",trash:"delete",cancel:"delete",
+  change:"edit",update:"edit",modify:"edit",fix:"edit",correct:"edit",rename:"edit",adjust:"edit",alter:"edit",
+  record:"log",enter:"log",input:"log",track:"log",clock:"log",clocked:"log",logging:"log",put:"log",entered:"log",
+  time:"hours",hrs:"hours",hour:"hours",worked:"hours",
+  price:"cost",money:"cost",spend:"cost",spending:"cost",expense:"cost",expenses:"cost",dollar:"cost",dollars:"cost",budgeting:"cost",
+  password:"passcode",passwords:"passcode",pin:"passcode",pass:"passcode",code:"passcode",
+  teammate:"member",teammates:"member",people:"member",person:"member",student:"member",students:"member",teammates2:"member",
+  signup:"register",enroll:"register",enrol:"register",join:"register",joining:"register",registering:"register",registration:"register",
+  logout:"signout",
+  signin:"login",
+  download:"export",print:"export",printing:"export",backup:"export",pdf:"export",csv:"export",exporting:"export",save2:"export",
+  administrator:"admin",instructor:"admin",teacher:"admin",professor:"admin",ta:"admin",
+  night:"dark",darkmode:"dark",
+  tool:"equipment",tools:"equipment",oscilloscope:"equipment",instrument:"equipment",rent:"equipment",rental:"equipment",renting:"equipment",gear:"equipment",
+  part:"materials",parts:"materials",supplies:"materials",supply:"materials",component:"materials",components:"materials",
+  freeze:"suspend",frozen:"suspend",disable:"suspend",lock:"suspend",locked:"suspend",block:"suspend",pause:"suspend",
+  cap:"limit",maximum:"limit",max:"limit",restrict:"limit",ceiling:"limit",
+  drag:"reorder",rearrange:"reorder",sort:"reorder",reorganize:"reorder",moved:"reorder",
+  find:"search",filter:"search",
+  complete:"done",completed:"done",completion:"done",finish:"done",finished:"done",
+  late:"behind",overdue:"behind",
+  saved:"sync",saving:"sync",autosave:"sync",automatic:"sync",automatically:"sync",realtime:"sync",collaborate:"sync",collaborating:"sync",simultaneously:"sync",
+  assign:"owner",assigned:"owner",assigning:"owner",responsible:"owner",
+  weeks:"schedule",week:"schedule",gantt:"schedule",calendar:"schedule",dates:"schedule",date:"schedule",timeline:"schedule",
+  colours:"colors",colour:"colors",recolor:"colors",
+  create:"add",creating:"add",making:"add",
+  task:"task",tasks:"task",item:"task",items:"task",activity:"task",job:"task",
+  switch:"view",views:"view",screen:"view",mode:"view",display:"view",tab:"view",
+  members:"member",owners:"owner" };
+function hpNorm(s){ return (s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/)
+  .filter(w=>w&&!HP_STOP.has(w)).map(w=>HP_SYN[w]||w); }
+HELP_KB.forEach(e=>{ const set=new Set(); e.k.forEach(kw=>hpNorm(kw).forEach(t=>set.add(t))); hpNorm(e.t).forEach(t=>set.add(t)); e._tok=set; });
+const HP_DF={}; HELP_KB.forEach(e=>e._tok.forEach(t=>{HP_DF[t]=(HP_DF[t]||0)+1;}));  // how many topics use each token
 function helpMatch(q){
-  q=" "+(q||"").toLowerCase().replace(/[^a-z0-9 %]/g," ")+" ";
-  let best=null,bs=0;
-  HELP_KB.forEach(e=>{ let s=0; e.k.forEach(kw=>{ if(q.includes(" "+kw+" ")||q.includes(kw)) s+=kw.split(" ").length; }); if(s>bs){bs=s;best=e;} });
-  return bs>=1?best:null;
+  const raw=" "+(q||"").toLowerCase().replace(/[^a-z0-9 %]/g," ")+" ";
+  const qt=hpNorm(q); let best=null,bs=0;
+  HELP_KB.forEach(e=>{ let s=0;
+    e.k.forEach(kw=>{ if(kw.indexOf(" ")>=0 && raw.indexOf(" "+kw+" ")>=0) s+=3; });   // exact phrase bonus
+    qt.forEach(t=>{ if(e._tok.has(t)) s+= 1/(HP_DF[t]||1); });                          // rarer/more specific tokens weigh more
+    if(s>bs){ bs=s; best=e; } });
+  return bs>=0.24?best:null;
 }
 function hpAdd(html,who){ const d=document.createElement("div"); d.className="hp-b "+who; d.innerHTML=html; $("#hpMsgs").appendChild(d); $("#hpMsgs").scrollTop=$("#hpMsgs").scrollHeight; }
 function hpSuggest(list){ $("#hpSug").innerHTML=list.map(t=>`<button class="hp-chip">${esc(t)}</button>`).join("");
