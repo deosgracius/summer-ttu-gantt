@@ -22,7 +22,7 @@
   --bg:#0a0a0b; --bg2:#101013;
   --panel:#171719; --panel-solid:#17171a; --panel2:rgba(255,255,255,.045);
   --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.16);
-  --txt:#f5f6f8; --txt2:#c4c7cf; --mut:#8d909c; --faint:#5d6069;
+  --txt:#f5f6f8; --txt2:#cdd0d8; --mut:#b4b8c2; --faint:#74777f;
   --primary:#fafafa; --primary-fg:#0a0a0a;
   --bar-shadow:0 1px 3px rgba(0,0,0,.55);
   --card-shadow:0 1px 2px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.28);
@@ -37,7 +37,7 @@
   --bg:#f7f8fa; --bg2:#eef1f6;
   --panel:#ffffff; --panel-solid:#ffffff; --panel2:#f3f4f7;
   --line:#e7e9ee; --line-strong:#d2d6df;
-  --txt:#0d1117; --txt2:#3a4150; --mut:#646b78; --faint:#8b91a0;
+  --txt:#0d1117; --txt2:#33394a; --mut:#4b5563; --faint:#79808f;
   --primary:#15171c; --primary-fg:#ffffff;
   --bar-shadow:0 1px 2px rgba(16,24,40,.10);
   --card-shadow:0 1px 2px rgba(16,24,40,.04), 0 2px 8px rgba(16,24,40,.05);
@@ -489,6 +489,8 @@ input:focus-visible,select:focus-visible{outline:none}
 </head>
 <body>
 <a href="#maincontent" class="skip">Skip to content</a>
+<div id="srLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+<div id="srAlert" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
 
 <!-- ============ GATE ============ -->
 <div id="gate">
@@ -626,8 +628,8 @@ input:focus-visible,select:focus-visible{outline:none}
   </div>
 
   <div class="tabs" id="maincontent" tabindex="-1" role="tablist" aria-label="Views">
-    <button class="tab active" data-view="timeline"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h10M4 12h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Timeline</button>
-    <button class="tab" data-view="budget"><svg viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Budget</button>
+    <button class="tab active" role="tab" aria-selected="true" data-view="timeline"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Timeline</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="budget"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Budget</button>
   </div>
 
   <div id="viewTimeline">
@@ -666,7 +668,7 @@ input:focus-visible,select:focus-visible{outline:none}
     <div class="hp-title"><span class="hp-dot"></span> Help Assistant</div>
     <button id="hpClose" aria-label="Close">✕</button>
   </div>
-  <div class="hp-msgs" id="hpMsgs"></div>
+  <div class="hp-msgs" id="hpMsgs" role="log" aria-live="polite" aria-label="Help conversation"></div>
   <div class="hp-sug" id="hpSug"></div>
   <div class="hp-input"><input id="hpInput" placeholder="Ask how to do anything…" autocomplete="off">
     <button id="hpSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
@@ -812,8 +814,8 @@ async function tryUnlock(p){
   try{
     PASS=p; const d=await apiLogin(p); sessionStorage.setItem("eh_pass",p);
     $("#gate").style.display="none";
-    if(d.admin){ adminRegCodeVal=d.reg_code||""; enterAdmin(d.groups); }
-    else { isAdminMode=false; apply(d); $("#app").style.display=""; startPolling(); }
+    if(d.admin){ adminRegCodeVal=d.reg_code||""; enterAdmin(d.groups); announce("Signed in as administrator."); }
+    else { isAdminMode=false; apply(d); $("#app").style.display=""; startPolling(); announce("Signed in to "+(cfg.title||"your project")+"."); }
   }catch(e){
     PASS=""; sessionStorage.removeItem("eh_pass");
     $("#gateerr").textContent = /suspend/i.test(e.message||"") ? e.message
@@ -1037,8 +1039,12 @@ async function poll(){
     if(JSON.stringify(d)!==lastSig){ apply(d); flashSync(); }
   }catch(e){ setSync("off"); }
 }
+let _lastSync="live";
 function setSync(s){ const el=$("#sync"); el.className="sync"+(s==="off"?" off":s==="saving"?" saving":"");
-  $("#syncTxt").textContent = s==="off"?"Offline":s==="saving"?"Saving…":"Live"; }
+  $("#syncTxt").textContent = s==="off"?"Offline":s==="saving"?"Saving…":"Live";
+  if(s==="off" && _lastSync!=="off") announce("Connection lost — your changes may not be saving.", true);
+  else if(s==="live" && _lastSync==="off") announce("Back online.");
+  _lastSync=s; }
 let flashT; function flashSync(){ $("#syncTxt").textContent="Updated"; clearTimeout(flashT); flashT=setTimeout(()=>setSync("live"),1200); }
 
 /* ====================== RENDER: DASHBOARD ====================== */
@@ -1376,7 +1382,8 @@ setTheme(localStorage.getItem("eh_theme")||"dark");
 
 /* ====================== UTIL ====================== */
 function err(e){ if(e&&(e.code==="28000"||/unauthorized/i.test(e.message||"")))return "Session expired — refresh and re-enter passcode."; return (e&&e.message)||"Something went wrong."; }
-let toastT; function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove("show"),2000);}
+function announce(msg, assertive){ const el=$(assertive?"#srAlert":"#srLive"); if(!el)return; el.textContent=""; setTimeout(()=>{el.textContent=msg;},40); }
+let toastT; function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove("show"),2000); announce(m);}
 let _rsT; window.addEventListener("resize",()=>{ clearTimeout(_rsT); _rsT=setTimeout(()=>{
   if($("#grid")&&$("#grid").children.length){ const pw=NAMEW+"|"+COLW; gridDims(); if(NAMEW+"|"+COLW!==pw) renderGrid(); else placeOverlay(); }
 },160); });
@@ -1406,7 +1413,9 @@ function setView(v){ curView=v;
   $("#viewTimeline").style.display = v==="timeline"?"":"none";
   $("#viewBudget").style.display = v==="budget"?"":"none";
   $("#addBtn").style.display = v==="timeline"?"":"none";
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected", t.dataset.view===v?"true":"false"));
   if(v==="timeline" && $("#grid").children.length) placeOverlay();
+  announce(v==="budget"?"Budget view":"Timeline view");
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>setView(t.dataset.view));
 
