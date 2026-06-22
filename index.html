@@ -37,7 +37,7 @@
   --bg:#f7f8fa; --bg2:#eef1f6;
   --panel:#ffffff; --panel-solid:#ffffff; --panel2:#f3f4f7;
   --line:#e7e9ee; --line-strong:#d2d6df;
-  --txt:#0d1117; --txt2:#3a4150; --mut:#6b7280; --faint:#a7adbb;
+  --txt:#0d1117; --txt2:#3a4150; --mut:#646b78; --faint:#8b91a0;
   --primary:#15171c; --primary-fg:#ffffff;
   --bar-shadow:0 1px 2px rgba(16,24,40,.10);
   --card-shadow:0 1px 2px rgba(16,24,40,.04), 0 2px 8px rgba(16,24,40,.05);
@@ -132,7 +132,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
 
 /* ============ DASHBOARD ============ */
 .dash{display:grid; grid-template-columns:repeat(auto-fit,minmax(184px,1fr)); gap:14px; margin-bottom:18px}
-.card{background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 100%,transparent),var(--panel)); border:1px solid var(--line); border-radius:var(--r);
+.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
   padding:18px 19px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; transition:box-shadow .25s, border-color .25s, transform .25s}
 .card::before{content:""; position:absolute; left:0; right:0; top:0; height:2px; background:var(--accent-grad); opacity:0; transition:opacity .25s}
 .card:hover{box-shadow:var(--card-shadow-hover); border-color:var(--line-strong); transform:translateY(-2px)}
@@ -479,9 +479,16 @@ input:focus-visible,select:focus-visible{outline:none}
   .bdash{grid-template-columns:1fr}
 }
 @media (hover:none){ .bar:hover{transform:none} .card:hover{transform:none} }
+.skip{position:fixed; left:12px; top:-60px; z-index:300; background:var(--primary); color:var(--primary-fg);
+  padding:10px 16px; border-radius:10px; font-weight:700; font-size:13px; text-decoration:none; box-shadow:var(--card-shadow-hover); transition:top .18s}
+.skip:focus{top:12px}
+.namecell[tabindex]{cursor:pointer}
+.namecell:focus-visible{outline:2.5px solid var(--deo); outline-offset:-2px; background:color-mix(in srgb,var(--deo) 10%,var(--panel-solid)); z-index:6}
+.namecell.kbsel{background:color-mix(in srgb,var(--deo) 12%,var(--panel-solid))}
 </style>
 </head>
 <body>
+<a href="#maincontent" class="skip">Skip to content</a>
 
 <!-- ============ GATE ============ -->
 <div id="gate">
@@ -618,7 +625,7 @@ input:focus-visible,select:focus-visible{outline:none}
     <button class="tbtn primary" id="addBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Add task</button>
   </div>
 
-  <div class="tabs">
+  <div class="tabs" id="maincontent" tabindex="-1" role="tablist" aria-label="Views">
     <button class="tab active" data-view="timeline"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h10M4 12h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Timeline</button>
     <button class="tab" data-view="budget"><svg viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Budget</button>
   </div>
@@ -1141,7 +1148,8 @@ function renderGrid(){
     const sp=items.length?Math.round(items.reduce((s,t)=>s+t.comp,0)/items.length):0;
     h+=`<div class="sec"><span class="secico">${sectionIcon(sec)}</span><span>${esc(sec)}</span><span class="cnt mono">${items.length}</span><div class="secbar"><i style="width:${sp}%"></i></div><span class="cnt mono">${sp}%</span></div>`;
     items.forEach(t=>{
-      h+=`<div class="namecell"${editMode?` draggable="true" data-drag="${t.id}"`:''}>${editMode?'<span class="drag">⠿</span>':''}<span class="d" style="background:${ownerColor(t.owner)}"></span><span class="nm" title="${esc(t.name)} · ${esc(ownerLabel(t.owner))}">${esc(t.name)}</span>
+      const wlab=(cfg.weeks[t.w0]||{}).label, wlab1=(cfg.weeks[t.w1]||{}).label;
+      h+=`<div class="namecell" tabindex="0" role="button" data-tid="${t.id}" aria-label="Task: ${esc(t.name)}, owner ${esc(ownerLabel(t.owner))}, ${t.comp}% complete, weeks ${esc(wlab||'')} to ${esc(wlab1||'')}. Press Enter to edit."${editMode?` draggable="true" data-drag="${t.id}"`:''}>${editMode?'<span class="drag" aria-hidden="true">⠿</span>':''}<span class="d" style="background:${ownerColor(t.owner)}" aria-hidden="true"></span><span class="nm" title="${esc(t.name)} · ${esc(ownerLabel(t.owner))}">${esc(t.name)}</span>
         <span class="acts"><button class="mini" data-edit="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">✎</button><button class="mini del" data-del="${t.id}" aria-label="Delete ${esc(t.name)}" title="Delete">×</button></span></div>`;
       if(progress){
         let cells='';
@@ -1379,6 +1387,18 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){
   if($("#helpPanel").classList.contains("show"))$("#helpPanel").classList.remove("show");
   const em=$("#exportMenu"); if(em)em.remove();
 }});
+/* keyboard navigation of the Gantt task rows */
+document.addEventListener("keydown",e=>{
+  const cell=document.activeElement;
+  if(!cell||!cell.classList||!cell.classList.contains("namecell")||!cell.dataset.tid) return;
+  const cells=[...document.querySelectorAll("#grid .namecell[data-tid]")], i=cells.indexOf(cell);
+  if(e.key==="ArrowDown"){ e.preventDefault(); (cells[i+1]||cells[0]).focus(); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); (cells[i-1]||cells[cells.length-1]).focus(); }
+  else if(e.key==="Home"){ e.preventDefault(); cells[0]&&cells[0].focus(); }
+  else if(e.key==="End"){ e.preventDefault(); cells[cells.length-1]&&cells[cells.length-1].focus(); }
+  else if((e.key==="Enter"||e.key===" ")&&!adminViewingGroup){ e.preventDefault(); openTask(cell.dataset.tid); }
+  else if((e.key==="Delete"||e.key==="Backspace")&&editMode&&!adminViewingGroup){ e.preventDefault(); delTask(cell.dataset.tid); }
+});
 
 /* ====================== TABS ====================== */
 function setView(v){ curView=v;
