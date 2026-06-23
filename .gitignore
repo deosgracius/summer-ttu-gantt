@@ -7,3 +7,4 @@ EventHub_Gantt.html
 # Private docs — contain credentials; never commit/serve publicly
 PROJECT-OVERVIEW.md
 *-PRIVATE.md
+*.pdf
