@@ -273,8 +273,10 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .tabs{display:flex; gap:4px; margin-bottom:18px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:4px; width:fit-content}
 .tab{display:inline-flex; align-items:center; gap:8px; padding:8px 17px; border-radius:7px; font-size:13px; font-weight:500; background:transparent; color:var(--mut); transition:.15s}
 .tab svg{width:16px;height:16px}
-.tab:hover{color:var(--txt2)}
-.tab.active{background:var(--panel); color:var(--txt); font-weight:600; box-shadow:var(--card-shadow)}
+.tab:hover{color:var(--txt2); background:var(--panel2)}
+.tab.active{background:color-mix(in srgb,var(--deo) 13%,var(--panel-solid)); color:var(--txt); font-weight:600;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 45%,var(--line-strong)), var(--card-shadow)}
+.tab.active svg{color:var(--deo)}
 
 /* ============ BUDGET ============ */
 .bdash{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:14px; margin-bottom:16px}
@@ -375,8 +377,9 @@ button{font-family:var(--font); cursor:pointer; border:0}
 /* view toggle + progress cells + drag */
 .vtoggle{display:flex; gap:3px; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:3px}
 .vtab{padding:7px 13px; border-radius:6px; font-size:12px; font-weight:600; background:transparent; color:var(--mut)}
-.vtab:hover{color:var(--txt2)}
-.vtab.active{background:var(--panel); color:var(--txt); box-shadow:var(--card-shadow)}
+.vtab:hover{color:var(--txt2); background:var(--panel2)}
+.vtab.active{background:color-mix(in srgb,var(--deo) 13%,var(--panel-solid)); color:var(--txt);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 45%,var(--line-strong)), var(--card-shadow)}
 .ptrack{position:relative}
 .pcell{position:absolute; top:6px; bottom:6px; border-radius:5px; box-shadow:var(--bar-shadow); cursor:default; transition:transform .1s}
 .editing .pcell{cursor:pointer}
@@ -1018,6 +1021,11 @@ function doLogout(){
 }
 
 /* ====================== DATA APPLY ====================== */
+// Order-independent signature so live-sync only flashes "Updated" on a REAL change,
+// not when the DB returns the same rows in a different order.
+function sigOf(d){ try{ return JSON.stringify({c:d.config,
+  t:(d.tasks||[]).slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)))}); }
+  catch(_){ return JSON.stringify(d); } }
 function apply(d){
   cfg = d.config || cfg;
   budget = (cfg.budget && Object.keys(cfg.budget).length) ? cfg.budget : defaultBudget();
@@ -1029,7 +1037,7 @@ function apply(d){
     cfg.now_week = Math.max(0, Math.min(cfg.weeks.length-1, _wk));
   }
   tasks = (d.tasks||[]).map(t=>({...t, comp:+t.comp||0, w0:+t.w0||0, w1:+t.w1||0, est_hours:+t.est_hours||0, logged_hours:+t.logged_hours||0, sort_order:+t.sort_order||0}));
-  lastSig = JSON.stringify(d);
+  lastSig = sigOf(d);
   $("#appTitle").textContent = cfg.title || "Software Engineering Lab";
   $("#appSub").textContent = cfg.subtitle || "";
   document.title = (cfg.title||"Software Engineering Lab")+" · Gantt & Budget";
@@ -1047,7 +1055,7 @@ async function poll(){
   try{
     setSync("live");
     const d=await apiLoad();
-    if(JSON.stringify(d)!==lastSig){ apply(d); flashSync(); }
+    if(sigOf(d)!==lastSig){ apply(d); flashSync(); }
   }catch(e){ setSync("off"); }
 }
 let _lastSync="live";
