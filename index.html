@@ -2188,58 +2188,71 @@ function hpDoAct(a){
     else if(a==="export"){ const b=$("#exportBtn"); if(b) b.click(); }
   }catch(_){}
 }
-/* answers computed from the user's actual project data (still 100% offline) */
-function hpDynamic(q){
+/* answers computed from the user's actual project data (still 100% offline).
+   `loose` = treat a short/elliptical follow-up ("and the hours?") as a state question. */
+function hpDynamic(q, loose){
   if(typeof cfg==="undefined" || !cfg || !cfg.weeks || !cfg.weeks.length) return null;
   const s=" "+(q||"").toLowerCase().replace(/[^a-z0-9 %]/g," ").replace(/\s+/g," ")+" ";
   const has=(...ws)=>ws.some(w=>s.includes(w));
   const act=(a,label)=>` <span class="hp-actrow"><button class="hp-act" data-act="${a}">${label}</button></span>`;
-  if(has("who are the member","who is on","who's on","list the member","list member","my team","team members","members are","who is in the","how many member")){
-    const m=memberList();
-    return m.length ? `Your group has <b>${m.length}</b> member${m.length===1?'':'s'}: <b>${m.map(esc).join("</b>, <b>")}</b>.`+act("settings","Manage members")
-                    : "No members are registered yet — add them in Settings."+act("settings","Open Settings");
-  }
-  if(has("how many task","number of task","task count","how many section")){
-    const ns=sectionsOf(tasks).length;
-    return `You have <b>${tasks.length}</b> task${tasks.length===1?'':'s'} across <b>${ns}</b> section${ns===1?'':'s'}.`+act("timeline","Open Timeline");
-  }
-  if(has("overall progress","our progress","my progress","how far along","progress so far","how complete are","how are we doing","what's our progress","what is our progress","percent complete")){
-    const op=tasks.length?Math.round(tasks.reduce((a,t)=>a+(+t.comp||0),0)/tasks.length):0;
-    return `Overall progress is <b>${op}%</b> — the average completion across your ${tasks.length} tasks.`+act("timeline","See the timeline");
-  }
-  if(has("what week","current week","which week are","what week is it","week are we")){
-    const w=cfg.weeks[cfg.now_week]||{};
-    return `It's currently <b>${esc(w.label||"?")}</b>${w.range?` (${esc(w.range)})`:""} — week ${cfg.now_week+1} of ${cfg.weeks.length}.`;
-  }
-  if(has("how many hour","total hour","hours logged","hours so far","logged so far","hours have we")){
-    const tot=tasks.reduce((a,t)=>a+(+t.logged_hours||0),0);
-    return `<b>${Math.round(tot*10)/10}</b> hours have been logged across the timeline so far.`+act("budget","Open Budget");
-  }
-  if(has("total cost","total budget","how much will","how much does","budget total","grand total","total estimate","actual to date","what's the budget","what is the budget")){
-    const c=calcBudget();
-    return `Budget — <b>estimate ${money(c.totalE)}</b>, <b>actual to date ${money(c.totalA)}</b>.`+act("budget","Open Budget");
-  }
-  if(has("how many week","number of week","project length","how long is the project","start and end","project dates","when does the project end","end date","project end")){
-    return `Your project runs <b>${fmtDate(budget.start)}</b> → <b>${fmtDate(budget.end)}</b> (${cfg.weeks.length} weeks).`;
+  const A={
+    members:()=>{ const m=memberList(); return m.length ? `Your group has <b>${m.length}</b> member${m.length===1?'':'s'}: <b>${m.map(esc).join("</b>, <b>")}</b>.`+act("settings","Manage members") : "No members are registered yet — add them in Settings."+act("settings","Open Settings"); },
+    tasks:()=>{ const ns=sectionsOf(tasks).length; return `You have <b>${tasks.length}</b> task${tasks.length===1?'':'s'} across <b>${ns}</b> section${ns===1?'':'s'}.`+act("timeline","Open Timeline"); },
+    progress:()=>{ const op=tasks.length?Math.round(tasks.reduce((a,t)=>a+(+t.comp||0),0)/tasks.length):0; return `Overall progress is <b>${op}%</b> — the average completion across your ${tasks.length} tasks.`+act("timeline","See the timeline"); },
+    week:()=>{ const w=cfg.weeks[cfg.now_week]||{}; return `It's currently <b>${esc(w.label||"?")}</b>${w.range?` (${esc(w.range)})`:""} — week ${cfg.now_week+1} of ${cfg.weeks.length}.`; },
+    hours:()=>{ const tot=tasks.reduce((a,t)=>a+(+t.logged_hours||0),0); return `<b>${Math.round(tot*10)/10}</b> hours have been logged across the timeline so far.`+act("budget","Open Budget"); },
+    budget:()=>{ const c=calcBudget(); return `Budget — <b>estimate ${money(c.totalE)}</b>, <b>actual to date ${money(c.totalA)}</b>.`+act("budget","Open Budget"); },
+    dates:()=>`Your project runs <b>${fmtDate(budget.start)}</b> → <b>${fmtDate(budget.end)}</b> (${cfg.weeks.length} weeks).`
+  };
+  if(has("who are the member","who is on","who's on","list the member","list member","my team","team members","members are","who is in the","how many member")) return A.members();
+  if(has("how many task","number of task","task count","how many section")) return A.tasks();
+  if(has("overall progress","our progress","my progress","how far along","progress so far","how complete are","how are we doing","what's our progress","what is our progress","percent complete")) return A.progress();
+  if(has("what week","current week","which week are","what week is it","week are we")) return A.week();
+  if(has("how many hour","total hour","hours logged","hours so far","logged so far","hours have we")) return A.hours();
+  if(has("total cost","total budget","how much will","how much does","budget total","grand total","total estimate","actual to date","what's the budget","what is the budget")) return A.budget();
+  if(has("how many week","number of week","project length","how long is the project","start and end","project dates","when does the project end","end date","project end")) return A.dates();
+  if(loose){   // elliptical follow-up — route a bare topic word to its state answer
+    if(has(" member"," team"," teammate")) return A.members();
+    if(has(" hour")) return A.hours();
+    if(has(" cost"," budget"," money"," spend"," dollar")) return A.budget();
+    if(has(" progress"," far along"," percent"," complete")) return A.progress();
+    if(has(" task"," section")) return A.tasks();
+    if(has(" week")) return A.week();
+    if(has(" date"," deadline"," finish"," end ")) return A.dates();
   }
   return null;
 }
+/* lightweight conversation memory: carry the previous topic into elliptical follow-ups */
+let hpPrev="";
+function hpIsFollowup(q, qt){
+  return qt.length<=1
+    || /^(and|also|then|ok|okay|more|what else|plus)\b/i.test(q)
+    || /\b(what|how) about\b/i.test(q)
+    || /\b(it|that|those|them|this|one|ones)\b/i.test(q);
+}
 function hpAsk(q){ q=(q||"").trim(); if(!q) return; hpAdd(esc(q),"me"); $("#hpInput").value="";
-  const dyn=hpDynamic(q);
-  const ranked=helpRank(q), top=ranked[0];
+  const qt=hpNorm(q);
+  const followup = hpIsFollowup(q, qt);
+  const aug = (followup && hpPrev) ? (q+" "+hpPrev) : q;     // blend in last topic for context
+  // an explicit how-to/action question wants instructions, not a data readout
+  const howto = /\b(how (do|to|can|would|should|does)|where|add|adding|create|creating|make|delete|remove|change|edit|rename|set|enable|disable|turn|move|drag|export|register|sign in|signin|log ?out|switch)\b/i.test(q) && !/\bhow many\b/i.test(q);
+  const dyn = howto ? null : hpDynamic(aug, followup);
+  const ranked=helpRank(aug), top=ranked[0];
   setTimeout(()=>{
     if(dyn){
       hpBotAnswer(dyn);
+      hpPrev=q;                                              // remember the data question we just answered
       const next=ranked.filter(r=>r.s>=0.2).slice(0,3).map(r=>r.e.t);
       hpSuggest(next.length?next:HP_STARTERS.slice(0,4));
       return;
     }
     if(top && top.s>=0.24){
       hpAnswer(top.e);
-      const next=ranked.filter(r=>r.e!==top.e && r.s>=Math.max(0.15, top.s*0.5)).slice(0,3).map(r=>r.e.t);  // genuinely-related follow-ups
+      hpPrev = q+" "+top.e.k.slice(0,4).join(" ");           // remember topic keywords for the next follow-up
+      const next=ranked.filter(r=>r.e!==top.e && r.s>=Math.max(0.15, top.s*0.5)).slice(0,3).map(r=>r.e.t);
       hpSuggest(next.length?next:HP_STARTERS.slice(0,4));
     } else {
-      const close=ranked.filter(r=>r.s>=0.12).slice(0,3).map(r=>r.e.t);               // near-misses, if any
+      const close=ranked.filter(r=>r.s>=0.12).slice(0,3).map(r=>r.e.t);
       hpAdd(close.length?"I'm not sure — did you mean one of these?":"I couldn't find that. Here are some things I can help with:","bot");
       hpSuggest(close.length?close:HP_STARTERS.slice(0,5));
     }
