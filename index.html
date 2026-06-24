@@ -1772,6 +1772,8 @@ function exportPDF(){
   const win = `${fmtDate(budget.start)} – ${fmtDate(budget.end)}`;
   const members = (c.members&&c.members.length)? c.members.join(', ') : '';
   const genDate = new Date().toLocaleDateString("en-US",{year:'numeric',month:'long',day:'numeric'});
+  const secProg = secs.map(s=>{ const it=tasks.filter(t=>t.section===s); const p=it.length?Math.round(it.reduce((a,t)=>a+(+t.comp||0),0)/it.length):0; return {s,p}; });
+  const secProgHTML = secProg.map(x=>`<div class="sp"><div class="spt"><span>${esc(x.s)}</span><b>${x.p}%</b></div><div class="spbar"><i style="width:${x.p}%"></i></div></div>`).join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(c.title||'Project')} — Final Report</title>
   <style>@page{size:landscape;margin:12mm}
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}
@@ -1785,6 +1787,13 @@ function exportPDF(){
   .scard span{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#8a93a0}
   .scard b{display:block;font-size:17px;color:#0d1117;margin-top:3px;font-weight:700}
   h2{font-size:14px;margin:18px 0 8px;color:#0d1117;padding-bottom:5px;border-bottom:1px solid #e4e7ec;page-break-after:avoid}
+  h2.pbreak{page-break-before:always;break-before:page}
+  .secprog{display:grid;grid-template-columns:repeat(4,1fr);gap:9px 18px;margin:2px 0 6px}
+  .sp{font-size:10.5px}
+  .sp .spt{display:flex;justify-content:space-between;margin-bottom:3px;color:#3a4250}
+  .sp .spt b{color:#0d1117}
+  .spbar{height:7px;background:#eceff3;border-radius:99px;overflow:hidden}
+  .spbar i{display:block;height:100%;background:linear-gradient(90deg,#0ea5e9,#8b5cf6)}
   .legend{margin:0 0 10px;font-size:11px}.lg{display:inline-flex;align-items:center;gap:5px;margin-right:14px}.lg i{width:12px;height:12px;border-radius:3px;display:inline-block}
   table.gt{border-collapse:collapse;width:100%;table-layout:fixed;font-size:9px;margin-bottom:8px}
   table.gt th,table.gt td{border:1px solid #d7dbe0;padding:2px}
@@ -1810,10 +1819,12 @@ function exportPDF(){
     <div class="scard"><span>Actual to date</span><b>${money(bg.totalA)}</b></div>
     ${members?`<div class="scard"><span>Team</span><b style="font-size:12px">${esc(members)}</b></div>`:''}
   </div>
+  <h2>Progress by Section</h2>
+  <div class="secprog">${secProgHTML}</div>
   <h2>Project Timeline</h2>
   <div class="legend">${leg}</div>
   <table class="gt"><thead><tr><th class="tn">Task</th>${hdr}</tr></thead><tbody>${rows}</tbody></table>
-  <h2>Budget</h2>${budgetHTML()}
+  <h2 class="pbreak">Budget</h2>${budgetHTML()}
   <div class="foot">Exported from Summer Timeline · ${esc(c.title||'')} · Generated ${genDate}, ${new Date().toLocaleTimeString()}</div>
   </body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>{ w.print(); }, 500);
