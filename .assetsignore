@@ -1,0 +1,7 @@
+# Files in the repo root that should NOT be publicly served by Cloudflare.
+# Only index.html (the app) needs to be reachable.
+*.md
+*.pdf
+.gitignore
+.assetsignore
+.github/

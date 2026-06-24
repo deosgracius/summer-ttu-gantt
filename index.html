@@ -272,6 +272,13 @@ button{font-family:var(--font); cursor:pointer; border:0}
   border:1px solid var(--line-strong); border-radius:12px; padding:11px 18px; font-size:13px; font-weight:600; box-shadow:var(--card-shadow);
   opacity:0; transition:.3s; z-index:300; pointer-events:none}
 .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+.utoast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel-solid); color:var(--txt);
+  border:1px solid var(--line-strong); border-radius:12px; padding:9px 9px 9px 18px; font-size:13px; font-weight:600; box-shadow:var(--card-shadow);
+  display:flex; align-items:center; gap:14px; opacity:0; transition:.3s; z-index:320; pointer-events:none}
+.utoast.show{opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto}
+.utoast .ubtn{border:0; background:color-mix(in srgb,var(--deo) 16%,transparent); color:var(--deo); font-weight:700; font-size:12.5px;
+  padding:6px 14px; border-radius:8px; cursor:pointer; transition:.15s}
+.utoast .ubtn:hover{background:color-mix(in srgb,var(--deo) 26%,transparent)}
 @media (max-width:640px){.legend{display:none}}
 
 /* ============ TABS ============ */
@@ -316,6 +323,7 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .exbadge{display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.03em; padding:1px 8px; border-radius:999px; vertical-align:middle; margin-left:6px;
   color:var(--both); background:color-mix(in srgb,var(--both) 16%,transparent); border:1px solid color-mix(in srgb,var(--both) 40%,transparent); text-transform:none}
 .brow .val .exempt{font-size:11px; font-weight:700; color:var(--mut); font-style:italic}
+.card .k .info{font-size:11px; color:var(--mut); cursor:help; margin-left:3px}
 .brow.grand{background:linear-gradient(90deg,color-mix(in srgb,var(--deo) 12%,transparent),color-mix(in srgb,var(--can) 12%,transparent))}
 .brow.grand .val{font-size:17px; font-weight:900}
 .brow.oh .nm{color:var(--mut); font-style:italic}
@@ -580,6 +588,7 @@ input:focus-visible,select:focus-visible{outline:none}
     <div class="spacer"></div>
     <button class="tbtn" id="adminRegCode" title="Registration code">🔑 Reg code</button>
     <button class="tbtn" id="adminExportAll" title="Export all groups as CSV">⬇ Export CSV</button>
+    <button class="tbtn" id="adminBackup" title="Download a full JSON backup of every group, task, member and budget">💾 Backup</button>
     <button class="tbtn" id="adminAudit" title="Audit log">📜 Audit log</button>
     <button class="tbtn" id="adminThemeBtn" title="Toggle theme"></button>
     <button class="tbtn" id="adminLogout"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out</button>
@@ -781,7 +790,9 @@ function ownerColor(o){ o=ownerCanon(o); if(o==="Shared") return "var(--both)";
   let h=0; for(let k=0;k<o.length;k++) h=(h*31+o.charCodeAt(k))%360; return "hsl("+h+" 60% 55%)"; }
 /* default status colors for the Progress view (user-customizable, stored locally) */
 const DEFAULT_STATUS={done:"#16a34a",behind:"#dc2626",progress:"#eab308",next:"#2563eb"};
-function statusColors(){ try{return {...DEFAULT_STATUS,...JSON.parse(localStorage.getItem("eh_status")||"{}")};}catch(e){return {...DEFAULT_STATUS};} }
+function statusColors(){ try{ const local=JSON.parse(localStorage.getItem("eh_status")||"{}");
+  const srv=(typeof cfg!=="undefined" && cfg && cfg.status_colors)||{};
+  return {...DEFAULT_STATUS,...local,...srv}; /* group setting wins over device cache */ }catch(e){return {...DEFAULT_STATUS};} }
 let timelineView = localStorage.getItem("eh_tlview")||"detailed";
 
 /* ====================== STATE ====================== */
@@ -807,6 +818,8 @@ async function apiSetNow(n){ return rpc("gantt_set_now",{p:PASS,n}); }
 async function apiSetMeta(t,s){ return rpc("gantt_set_meta",{p:PASS,new_title:t,new_subtitle:s}); }
 async function apiSetPass(o,n){ return rpc("gantt_set_passcode",{p_old:o,p_new:n}); }
 async function apiSetBudget(b){ return rpc("gantt_set_budget",{p:PASS,b}); }
+async function apiSetStatusColors(colors){ return rpc("gantt_set_status_colors",{p:PASS,colors}); }
+async function apiAdminExport(){ return rpc("admin_export_all",{admin_p:PASS}); }
 async function apiLogin(p){ return rpc("login",{p}); }
 async function apiListClasses(){ return rpc("list_classes",{}); }
 async function apiRegister(a){ return rpc("register_group",a); }
@@ -980,6 +993,19 @@ $("#adminExportAll").onclick=()=>{
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); toast("Exported "+adminGroups.length+" groups");
 };
 
+/* ---- full JSON backup (every group, task, member, budget) ---- */
+$("#adminBackup").onclick=async()=>{
+  const btn=$("#adminBackup"); const old=btn.textContent; btn.textContent="💾 …"; btn.disabled=true;
+  try{ const data=await apiAdminExport();
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="summer-timeline-backup-"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast("Backup downloaded ("+((data.groups||[]).length)+" groups)");
+  }catch(e){ alert(err(e)); }
+  finally{ btn.textContent=old; btn.disabled=false; }
+};
+
 /* ---- registration code ---- */
 $("#adminRegCode").onclick=async()=>{
   const cur=adminRegCodeVal||"";
@@ -1044,7 +1070,8 @@ function apply(d){
     const _wk = Math.floor((Date.now() - _ps.getTime())/(7*86400000));
     cfg.now_week = Math.max(0, Math.min(cfg.weeks.length-1, _wk));
   }
-  tasks = (d.tasks||[]).map(t=>({...t, comp:+t.comp||0, w0:+t.w0||0, w1:+t.w1||0, est_hours:+t.est_hours||0, logged_hours:+t.logged_hours||0, sort_order:+t.sort_order||0}));
+  tasks = (d.tasks||[]).map(t=>({...t, comp:+t.comp||0, w0:+t.w0||0, w1:+t.w1||0, est_hours:+t.est_hours||0, logged_hours:+t.logged_hours||0, sort_order:+t.sort_order||0}))
+    .filter(t=>!pendingDeletes[t.id]);   // don't resurrect a task that's mid-undo
   lastSig = sigOf(d);
   $("#appTitle").textContent = cfg.title || "Software Engineering Lab";
   $("#appSub").textContent = cfg.subtitle || "";
@@ -1054,23 +1081,30 @@ function apply(d){
 function defaultBudget(){ return {start:"2026-06-03",today:"2026-06-17",end:"2026-08-05",labor:[],laborOhRate:1,contract:[],material:[],rental:[],bizOhRate:0.55}; }
 
 /* ====================== POLLING (live sync) ====================== */
-let pollTimer=null;
-function startPolling(){ if(pollTimer)clearInterval(pollTimer); pollTimer=setInterval(poll, POLL_MS); }
+// Event-driven scheduling: pauses when the tab is hidden (saves backend egress),
+// and backs off exponentially while the connection is failing, then recovers.
+let pollTimer=null, pollFails=0;
+function nextPollMs(){ return pollFails ? Math.min(POLL_MS*Math.pow(2,pollFails), 60000) : POLL_MS; }
+function scheduleNextPoll(){ clearTimeout(pollTimer); if(!PASS || document.hidden) return; pollTimer=setTimeout(poll, nextPollMs()); }
+function startPolling(){ clearTimeout(pollTimer); pollFails=0; scheduleNextPoll(); }
 async function poll(){
-  if(modalOpen) return;            // don't clobber an open editor
+  if(modalOpen || document.hidden){ scheduleNextPoll(); return; }   // don't clobber an open editor
   const ae=document.activeElement;
-  if(ae && ae.closest && ae.closest("#viewBudget") && ae.tagName==="INPUT") return; // mid budget edit
+  if(ae && ae.closest && ae.closest("#viewBudget") && ae.tagName==="INPUT"){ scheduleNextPoll(); return; } // mid budget edit
   try{
-    setSync("live");
     const d=await apiLoad();
+    pollFails=0;
     if(sigOf(d)!==lastSig){ apply(d); flashSync(); }
-  }catch(e){ setSync("off"); }
+    setSync("live");
+  }catch(e){ pollFails++; setSync(pollFails>=3?"off":"recon"); }
+  scheduleNextPoll();
 }
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ clearTimeout(pollTimer); } else if(PASS){ pollFails=0; poll(); } });
 let _lastSync="live";
-function setSync(s){ const el=$("#sync"); el.className="sync"+(s==="off"?" off":s==="saving"?" saving":"");
-  $("#syncTxt").textContent = s==="off"?"Offline":s==="saving"?"Saving…":"Live";
-  if(s==="off" && _lastSync!=="off") announce("Connection lost — your changes may not be saving.", true);
-  else if(s==="live" && _lastSync==="off") announce("Back online.");
+function setSync(s){ const el=$("#sync"); el.className="sync"+(s==="off"?" off":(s==="saving"||s==="recon")?" saving":"");
+  $("#syncTxt").textContent = s==="off"?"Offline — retrying…":s==="recon"?"Reconnecting…":s==="saving"?"Saving…":"Live";
+  if(s==="off" && _lastSync!=="off") announce("Connection lost — retrying automatically.", true);
+  else if(s==="live" && (_lastSync==="off"||_lastSync==="recon")) announce("Back online.");
   _lastSync=s; }
 let flashT; function flashSync(){ $("#syncTxt").textContent="Updated"; clearTimeout(flashT); flashT=setTimeout(()=>setSync("live"),1200); }
 
@@ -1329,19 +1363,31 @@ $("#tmSave").onclick=async()=>{
   const rec={ id: editingId||"", section:($("#f_section").value||"General").trim(), name, owner:chosenOwner,
     comp:+$("#f_comp").value, w0, w1, est_hours:+$("#f_est").value||0, logged_hours:+$("#f_log").value||0,
     sort_order: t? t.sort_order : (Math.max(0,...tasks.map(x=>x.sort_order))+1) };
+  if(t && t.updated_at) rec.updated_at = t.updated_at;   // optimistic-concurrency token
   const btn=$("#tmSave");btn.disabled=true;btn.textContent="Saving…";setSync("saving");
   try{ const saved=await apiSave(rec); upsertLocal(saved); closeTask(); renderAll(); toast(editingId?"Task updated":"Task added"); setSync("live");
-  }catch(e){ $("#tmErr").textContent=err(e); setSync("off"); }
+  }catch(e){
+    if(String((e&&e.message)||e).toLowerCase().includes("conflict")){
+      $("#tmErr").textContent="A teammate just changed this task. Loading their latest version…";
+      setSync("saving");
+      try{ const d=await apiLoad(); apply(d); }catch(_){}
+      setTimeout(()=>{ closeTask(); toast("Reloaded the latest version — re-apply your change if needed."); setSync("live"); }, 1300);
+    } else { $("#tmErr").textContent=err(e); setSync("off"); }
+  }
   finally{btn.disabled=false;btn.textContent="Save task";}
 };
 $("#tmDel").onclick=()=>delTask(editingId,true);
 
-async function delTask(id,fromModal){
+function delTask(id,fromModal){
   const t=tasks.find(x=>x.id===id); if(!t)return;
-  if(!confirm(`Delete "${t.name}"?`))return;
-  setSync("saving");
-  try{ await apiDelete(id); tasks=tasks.filter(x=>x.id!==id); if(fromModal)closeTask(); renderAll(); toast("Task deleted"); setSync("live");
-  }catch(e){ alert(err(e)); setSync("off"); }
+  if(fromModal) closeTask();
+  tasks=tasks.filter(x=>x.id!==id); renderAll();
+  const timer=setTimeout(async()=>{ delete pendingDeletes[id]; setSync("saving");
+    try{ await apiDelete(id); setSync("live"); }
+    catch(e){ setSync("off"); toast("Delete failed — restoring task"); if(!tasks.some(x=>x.id===t.id)){ tasks.push(t); tasks.sort((a,b)=>a.sort_order-b.sort_order); renderAll(); } } }, 5500);
+  pendingDeletes[id]={timer};
+  undoToast(`Deleted "${t.name}"`, ()=>{ clearTimeout(timer); delete pendingDeletes[id];
+    if(!tasks.some(x=>x.id===t.id)){ tasks.push(t); tasks.sort((a,b)=>a.sort_order-b.sort_order); } renderAll(); toast("Restored"); });
 }
 function upsertLocal(saved){ const i=tasks.findIndex(x=>x.id===saved.id);
   saved={...saved,comp:+saved.comp,w0:+saved.w0,w1:+saved.w1,est_hours:+saved.est_hours,logged_hours:+saved.logged_hours,sort_order:+saved.sort_order};
@@ -1357,13 +1403,17 @@ async function renameSection(sec){
        renderAll(); toast(`Section renamed to "${name}"`); setSync("live"); }
   catch(e){ setSync("off"); alert(err(e)); }
 }
-async function deleteSection(sec){
-  const affected=tasks.filter(t=>t.section===sec);
-  if(!confirm(`Delete section "${sec}" and its ${affected.length} task${affected.length===1?'':'s'}? This cannot be undone.`)) return;
-  setSync("saving");
-  try{ for(const t of affected){ await apiDelete(t.id); }
-       tasks=tasks.filter(t=>t.section!==sec); renderAll(); toast("Section deleted"); setSync("live"); }
-  catch(e){ setSync("off"); alert(err(e)); }
+function deleteSection(sec){
+  const affected=tasks.filter(t=>t.section===sec); if(!affected.length) return;
+  const ids=affected.map(t=>t.id);
+  tasks=tasks.filter(t=>t.section!==sec); renderAll();
+  const timer=setTimeout(async()=>{ ids.forEach(id=>delete pendingDeletes[id]); setSync("saving");
+    try{ for(const id of ids){ await apiDelete(id); } setSync("live"); }catch(e){ setSync("off"); } }, 5500);
+  ids.forEach(id=>pendingDeletes[id]={timer});
+  undoToast(`Deleted section "${sec}" (${affected.length} task${affected.length===1?'':'s'})`, ()=>{ clearTimeout(timer);
+    ids.forEach(id=>delete pendingDeletes[id]);
+    affected.forEach(t=>{ if(!tasks.some(x=>x.id===t.id)) tasks.push(t); });
+    tasks.sort((a,b)=>a.sort_order-b.sort_order); renderAll(); toast("Section restored"); });
 }
 function addSection(){
   const nn=prompt("Name the new section (e.g. Backend, Frontend, Setup & Planning):"); if(nn==null) return;
@@ -1398,8 +1448,13 @@ async function removeMember(n){
 }
 $("#s_addmem").onclick=addMemberSettings;
 $("#s_newmem").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addMemberSettings();}});
-$("#sColors").onclick=()=>{ localStorage.setItem("eh_status",JSON.stringify({done:sc_done.value,behind:sc_behind.value,progress:sc_progress.value,next:sc_next.value})); renderLegend(); renderGrid(); toast("Colors saved"); };
-$("#sColorsReset").onclick=()=>{ localStorage.removeItem("eh_status"); const sc=statusColors(); sc_done.value=sc.done; sc_behind.value=sc.behind; sc_progress.value=sc.progress; sc_next.value=sc.next; renderLegend(); renderGrid(); toast("Colors reset"); };
+$("#sColors").onclick=async()=>{ const colors={done:sc_done.value,behind:sc_behind.value,progress:sc_progress.value,next:sc_next.value};
+  localStorage.setItem("eh_status",JSON.stringify(colors)); cfg.status_colors=colors; renderLegend(); renderGrid();
+  setSync("saving"); try{ await apiSetStatusColors(colors); setSync("live"); toast("Colors saved for the whole group"); }
+  catch(e){ setSync("off"); toast("Saved on this device (group sync failed)"); } };
+$("#sColorsReset").onclick=async()=>{ localStorage.removeItem("eh_status"); cfg.status_colors=null;
+  const sc=statusColors(); sc_done.value=sc.done; sc_behind.value=sc.behind; sc_progress.value=sc.progress; sc_next.value=sc.next; renderLegend(); renderGrid();
+  setSync("saving"); try{ await apiSetStatusColors(null); setSync("live"); toast("Colors reset for the group"); }catch(e){ setSync("off"); toast("Reset on this device"); } };
 function closeSet(){modalOpen=false;$("#setModal").classList.remove("show");}
 $("#sCancel").onclick=closeSet;
 $("#setModal").addEventListener("click",e=>{if(e.target.id==="setModal")closeSet();});
@@ -1442,6 +1497,18 @@ setTheme(localStorage.getItem("eh_theme")||"dark");
 function err(e){ if(e&&(e.code==="28000"||/unauthorized/i.test(e.message||"")))return "Session expired — refresh and re-enter passcode."; return (e&&e.message)||"Something went wrong."; }
 function announce(msg, assertive){ const el=$(assertive?"#srAlert":"#srLive"); if(!el)return; el.textContent=""; setTimeout(()=>{el.textContent=msg;},40); }
 let toastT; function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove("show"),2000); announce(m);}
+/* undoable-delete plumbing: deletes are deferred ~5.5s and can be undone */
+let pendingDeletes={}, utoastT;
+function undoToast(msg, onUndo){
+  let el=$("#utoast");
+  if(!el){ el=document.createElement("div"); el.id="utoast"; el.className="utoast"; document.body.appendChild(el); }
+  el.innerHTML=`<span></span><button type="button" class="ubtn">Undo</button>`;
+  el.querySelector("span").textContent=msg;
+  el.classList.add("show");
+  clearTimeout(utoastT); utoastT=setTimeout(()=>el.classList.remove("show"),5500);
+  el.querySelector(".ubtn").onclick=()=>{ clearTimeout(utoastT); el.classList.remove("show"); onUndo&&onUndo(); };
+  announce(msg);
+}
 let _rsT; window.addEventListener("resize",()=>{ clearTimeout(_rsT); _rsT=setTimeout(()=>{
   if($("#grid")&&$("#grid").children.length){ const pw=NAMEW+"|"+COLW; gridDims(); if(NAMEW+"|"+COLW!==pw) renderGrid(); else placeOverlay(); }
 },160); });
@@ -1534,7 +1601,7 @@ function renderBudget(){
         <div class="mid"><span>Today · ${Math.round(pct)}% elapsed</span><b>${fmtDate(budget.today)}</b></div>
         <div class="end"><span>End</span><b>${fmtDate(budget.end)}</b></div>
       </div></div>
-    <div class="card bhero act"><div class="k">Actual to date</div><div class="v">${money(c.totalA)}</div>
+    <div class="card bhero act" title="Labor + contract + materials + equipment rental + overhead incurred so far. Equipment rental is the committed amount for the project (it appears in full, not prorated by day)."><div class="k">Actual to date <span class="info" aria-hidden="true">ⓘ</span></div><div class="v">${money(c.totalA)}</div>
       <div class="bcmp">Direct + contract + materials + equipment + overhead</div></div>
     <div class="card bhero est"><div class="k">Total estimate</div><div class="v">${money(c.totalE)}</div>
       <div class="bcmp">${spent}% of estimated budget used · ${money(Math.max(0,c.totalE-c.totalA))} remaining</div>
