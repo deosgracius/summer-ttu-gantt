@@ -1564,12 +1564,19 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>setView(t.dataset.vie
 /* ====================== BUDGET ====================== */
 const num=x=>+x||0;
 const money=n=>"$"+(Math.round(num(n)*100)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
-/* a member's actual hours = sum of logged hours on their tasks (from the timeline),
-   unless manually corrected in the budget (l.manualA) */
-function memberLogged(name){ return tasks.reduce((s,t)=> s + (ownerCanon(t.owner)===name ? (+t.logged_hours||0) : 0), 0); }
+/* A member's actual hours ALWAYS reflect the timeline: hours logged on their own tasks,
+   plus an even share of hours logged on "Shared" tasks (so every logged hour is counted).
+   This is the single source of truth — to correct hours, edit the logged hours on the timeline. */
+function sharedLoggedHours(){ return tasks.reduce((s,t)=> s + (ownerCanon(t.owner)==="Shared" ? (+t.logged_hours||0) : 0), 0); }
+function memberLogged(name){
+  const own = tasks.reduce((s,t)=> s + (ownerCanon(t.owner)===name ? (+t.logged_hours||0) : 0), 0);
+  const ms = memberList();
+  if(!ms.includes(name)) return own;
+  return own + (ms.length ? sharedLoggedHours()/ms.length : 0);
+}
 function laborLine(name){ return (budget.labor||[]).find(l=>l.name===name); }
-function memberActualHours(name){ const l=laborLine(name); if(l&&l.manualA) return num(l.hrsA); return memberLogged(name); }
-function syncLaborHours(){ (budget.labor||[]).forEach(l=>{ if(memberList().includes(l.name) && !l.manualA) l.hrsA = memberLogged(l.name); }); }
+function memberActualHours(name){ return memberLogged(name); }
+function syncLaborHours(){ (budget.labor||[]).forEach(l=>{ if(memberList().includes(l.name)){ l.hrsA = memberLogged(l.name); delete l.manualA; } }); }
 function calcBudget(){
   syncLaborHours();
   const b=budget, L=b.labor||[], C=b.contract||[], M=b.material||[], R=b.rental||[];
@@ -1639,20 +1646,25 @@ function renderBudget(){
   h+=`<div class="btable">${head("Direct Labor")}`;
   (budget.labor||[]).forEach((r,i)=>{
     const isMem=memberList().includes(r.name);
-    const a=num(r.rate)*num(r.hrsA), es=num(r.rate)*num(r.hrsE);
-    // actual hours: auto from the timeline; editable to correct a mistake (becomes a manual override)
+    const hrsA = isMem ? memberActualHours(r.name) : num(r.hrsA);
+    const a=num(r.rate)*hrsA, es=num(r.rate)*num(r.hrsE);
+    const hrsTxt = Math.round(hrsA*10)/10;
+    // Member actual hours are READ-ONLY — they always reflect the timeline's logged hours.
     let actCell;
-    if(e){
-      actCell = `${inp("labor",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`
-              + (isMem ? (r.manualA ? ` <button class="bresync" data-resync="${i}" title="Reset to timeline">↻</button>` : `<div class="sub">auto from timeline</div>`) : '');
+    if(isMem){
+      actCell = `${money(a)}<div class="sub">${hrsTxt} hrs · from timeline</div>`;
+    } else if(e){
+      actCell = `${inp("labor",i,"hrsA",r.hrsA)} <small>hrs · ${money(a)}</small>`;
     } else {
-      actCell = `${money(a)}<div class="sub">${num(r.hrsA)} hrs${isMem?(r.manualA?' · edited':' · from timeline'):''}</div>`;
+      actCell = `${money(a)}<div class="sub">${num(r.hrsA)} hrs</div>`;
     }
     h+=`<div class="brow"><div class="nm">${e?inp("labor",i,"name",r.name,"nm"):esc(r.name)}
         <span class="sub">${e?`$${inp("labor",i,"rate",r.rate)}/hr`:`$${num(r.rate)}/hr`}</span></div>
       <div class="val act">${actCell}</div>
       <div class="val">${e?`${inp("labor",i,"hrsE",r.hrsE)} <small>hrs · ${money(es)}</small>${e?`<button class="bdel" data-del="labor" data-idx="${i}">×</button>`:""}`:`${money(es)}<div class="sub">${num(r.hrsE)} hrs</div>`}</div></div>`;
   });
+  { const shrd=sharedLoggedHours(), nm=memberList().length;
+    if(shrd>0 && nm>0) h+=`<div class="brow"><div class="nm sub" style="grid-column:1/-1; font-weight:500">↳ Actual hours come from the timeline's logged hours. ${Math.round(shrd*10)/10} hrs logged on <b>Shared</b> tasks are split evenly across ${nm} member${nm===1?'':'s'}.</div></div>`; }
   if(e) h+=`<div class="baddrow"><button class="badd" data-add="labor">+ Add labor line</button></div>`;
   h+=`<div class="brow oh"><div class="nm">Labor overhead</div>
       <div class="val act">${e?`${inp("root",-1,"laborOhRate",Math.round(c.loh*1000)/10)}<small>%</small>`:Math.round(c.loh*100)+"%"} · ${money(c.TDLa-c.DLa)}</div>
@@ -1721,20 +1733,16 @@ $("#viewBudget").addEventListener("change",ev=>{
   if(field==="laborOhRate"||field==="bizOhRate"){ v=num(v)/100; }
   else if(field==="name"||dateFields.includes(field)){ /* keep string */ }
   else { v=num(v); }
-  if(sec==="root"){ budget[field]=v; } else { if(!budget[sec])budget[sec]=[]; budget[sec][idx][field]=v;
-    // editing a member's actual hours = a manual correction that overrides the timeline sum
-    if(sec==="labor" && field==="hrsA" && memberList().includes(budget.labor[idx].name)) budget.labor[idx].manualA=true;
-  }
+  if(sec==="root"){ budget[field]=v; } else { if(!budget[sec])budget[sec]=[]; budget[sec][idx][field]=v; }
   saveBudget(); renderBudget();
 });
 $("#viewBudget").addEventListener("click",ev=>{
-  const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]"), rs=ev.target.closest("[data-resync]");
+  const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]");
   if(add){ const s=add.dataset.add; if(!budget[s])budget[s]=[];
     const def={labor:{name:"New role",rate:12,hrsA:0,hrsE:0},contract:{name:"New contractor",rate:0,hrsA:0,hrsE:0},
       material:{name:"New item",a:0,e:0},rental:{name:"New equipment",value:0,rate:0.2}}[s];
     budget[s].push({...def}); saveBudget(); renderBudget(); }
   if(del){ const s=del.dataset.del, i=+del.dataset.idx; budget[s].splice(i,1); saveBudget(); renderBudget(); }
-  if(rs){ const i=+rs.dataset.resync; if(budget.labor[i]){ delete budget.labor[i].manualA; budget.labor[i].hrsA=memberLogged(budget.labor[i].name); } saveBudget(); renderBudget(); }
 });
 let budgetSaveT;
 function saveBudget(){ setSync("saving"); clearTimeout(budgetSaveT); budgetSaveT=setTimeout(async()=>{
