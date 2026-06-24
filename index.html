@@ -1494,13 +1494,13 @@ function calcBudget(){
   const TCLa=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsA),0), TCLe=C.reduce((s,r)=>s+num(r.rate)*num(r.hrsE),0);
   const TDMa=M.reduce((s,r)=>s+num(r.a),0), TDMe=M.reduce((s,r)=>s+num(r.e),0);
   const days=projectDays();
-  // equipment rental = value × (rate% per day) × project days — an ESTIMATE only;
-  // it is not part of "actual to date" (Direct + contract + materials + overhead spent so far).
+  // equipment rental = value × (rate% per day) × project days.
+  // It is automatically included in BOTH the Actual and the Estimate columns (and both totals).
   // The Software Engineering Lab class is EXEMPT from the equipment rental fee; every other
   // class must include the Estimated Total Rental (ETRM) in the final budget.
   const ETRMexempt=rentalExempt();
   const ETRMeRaw=R.reduce((s,r)=>s+num(r.value)*(num(r.rate)/100)*days,0);
-  const ETRMe=ETRMexempt?0:ETRMeRaw, ETRMa=0;
+  const ETRMe=ETRMexempt?0:ETRMeRaw, ETRMa=ETRMe;
   const subA=TDLa+TCLa+TDMa+ETRMa, subE=TDLe+TCLe+TDMe+ETRMe, boh=num(b.bizOhRate);
   const bizA=subA*boh, bizE=subE*boh;
   return {DLa,DLe,TDLa,TDLe,TCLa,TCLe,TDMa,TDMe,ETRMa,ETRMe,ETRMeRaw,ETRMexempt,subA,subE,bizA,bizE,totalA:subA+bizA,totalE:subE+bizE,loh,boh};
@@ -1535,7 +1535,7 @@ function renderBudget(){
         <div class="end"><span>End</span><b>${fmtDate(budget.end)}</b></div>
       </div></div>
     <div class="card bhero act"><div class="k">Actual to date</div><div class="v">${money(c.totalA)}</div>
-      <div class="bcmp">Direct + contract + materials + overhead, spent so far</div></div>
+      <div class="bcmp">Direct + contract + materials + equipment + overhead</div></div>
     <div class="card bhero est"><div class="k">Total estimate</div><div class="v">${money(c.totalE)}</div>
       <div class="bcmp">${spent}% of estimated budget used · ${money(Math.max(0,c.totalE-c.totalA))} remaining</div>
       <div class="pbar"><i style="width:${spent}%"></i></div></div>
@@ -1611,7 +1611,7 @@ function renderBudget(){
   });
   if(e) h+=`<div class="baddrow"><button class="badd" data-add="rental">+ Add equipment</button></div>`;
   if(!(budget.rental||[]).length && !e) h+=`<div class="brow"><div class="nm sub">No equipment rental</div><div class="val act">—</div><div class="val">$0.00</div></div>`;
-  h+=`<div class="brow tot"><div class="nm">Estimated Total Rental (ETRM)${exempt?` <span class="sub" style="font-weight:600">— not charged to SE Lab</span>`:` <span class="sub" style="font-weight:600">— included in final budget</span>`}</div><div class="val act"></div><div class="val">${exempt?`$0.00`:money(c.ETRMe)}</div></div></div>`;
+  h+=`<div class="brow tot"><div class="nm">Estimated Total Rental (ETRM)${exempt?` <span class="sub" style="font-weight:600">— not charged to SE Lab</span>`:` <span class="sub" style="font-weight:600">— included in final budget</span>`}</div><div class="val act">${exempt?`$0.00`:money(c.ETRMa)}</div><div class="val">${exempt?`$0.00`:money(c.ETRMe)}</div></div></div>`;
 
   // ---- Totals ----
   h+=`<div class="btable">${head("Project Total")}
@@ -1863,7 +1863,7 @@ const HELP_KB=[
  {k:["overhead","markup"],t:"Overhead",
   a:"Labor gets a <b>100% overhead</b> on wages. A separate business-overhead % sits on the Project Total row (0% by default for labs)."},
  {k:["actual to date","spent so far"],t:"Actual to date",
-  a:"<b>Actual to date</b> = Direct Labor + Contract + Materials + overhead spent so far. <b>Total estimate</b> is the full planned cost including equipment."},
+  a:"<b>Actual to date</b> = Direct Labor + Contract + Materials + Equipment Rental + overhead. Equipment rental (ETRM) is included in both the Actual and Estimate columns (except for Software Engineering Lab, which is exempt)."},
  {k:["budget limit","cap","over budget"],t:"Budget limit",
   a:"An admin can set a <b>budget cap</b>. If your total estimate goes over it, the Budget shows a red over-limit warning."},
  {k:["export","pdf","download","print","markdown","obsidian"],t:"Export",
