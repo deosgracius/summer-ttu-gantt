@@ -1044,7 +1044,8 @@ async function adminReset(gid,name){
 $("#adminLogout").onclick=()=>{ doLogout(); };
 $("#adminThemeBtn").onclick=()=>setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
 function doLogout(){
-  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  if(pollTimer){clearTimeout(pollTimer);pollTimer=null;}
+  teardownRealtime();
   Object.keys(_counts).forEach(k=>delete _counts[k]);
   PASS=""; sessionStorage.removeItem("eh_pass"); isAdminMode=false; adminViewingGroup=false; editMode=false; modalOpen=false;
   $("#taskModal").classList.remove("show"); $("#setModal").classList.remove("show");
@@ -1077,6 +1078,7 @@ function apply(d){
   $("#appSub").textContent = cfg.subtitle || "";
   document.title = (cfg.title||"Software Engineering Lab")+" · Gantt & Budget";
   renderAll();
+  setupRealtime();
 }
 function defaultBudget(){ return {start:"2026-06-03",today:"2026-06-17",end:"2026-08-05",labor:[],laborOhRate:1,contract:[],material:[],rental:[],bizOhRate:0.55}; }
 
@@ -1084,8 +1086,23 @@ function defaultBudget(){ return {start:"2026-06-03",today:"2026-06-17",end:"202
 // Event-driven scheduling: pauses when the tab is hidden (saves backend egress),
 // and backs off exponentially while the connection is failing, then recovers.
 let pollTimer=null, pollFails=0;
-function nextPollMs(){ return pollFails ? Math.min(POLL_MS*Math.pow(2,pollFails), 60000) : POLL_MS; }
+// When realtime is connected, polling is just a slow safety net (30s); otherwise it's the primary sync (6s).
+function nextPollMs(){ return pollFails ? Math.min(POLL_MS*Math.pow(2,pollFails), 60000) : (rtConnected ? 30000 : POLL_MS); }
 function scheduleNextPoll(){ clearTimeout(pollTimer); if(!PASS || document.hidden) return; pollTimer=setTimeout(poll, nextPollMs()); }
+
+/* ---- Realtime: subscribe to this group's broadcast channel for instant updates ---- */
+let rtChannel=null, rtTopic=null, rtConnected=false, rtPollT=null;
+function setupRealtime(){
+  const id = (typeof cfg!=="undefined" && cfg) ? cfg.id : null; if(!id) return;
+  const topic = 'grp:'+id;
+  if(topic===rtTopic && rtChannel) return;          // already subscribed to this group
+  teardownRealtime();
+  rtTopic = topic;
+  rtChannel = sb.channel(topic)
+    .on('broadcast', {event:'changed'}, ()=>{ clearTimeout(rtPollT); rtPollT=setTimeout(()=>{ if(!document.hidden && !modalOpen) poll(); }, 250); })
+    .subscribe(status=>{ rtConnected = (status==='SUBSCRIBED'); });
+}
+function teardownRealtime(){ if(rtChannel){ try{ sb.removeChannel(rtChannel); }catch(e){} } rtChannel=null; rtTopic=null; rtConnected=false; }
 function startPolling(){ clearTimeout(pollTimer); pollFails=0; scheduleNextPoll(); }
 async function poll(){
   if(modalOpen || document.hidden){ scheduleNextPoll(); return; }   // don't clobber an open editor
