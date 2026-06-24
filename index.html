@@ -465,6 +465,10 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .hp-fb{display:flex; align-items:center; gap:6px; margin-top:9px; padding-top:8px; border-top:1px solid var(--line); font-size:11px; color:var(--mut)}
 .hp-fbb{width:26px; height:24px; border-radius:6px; background:var(--panel-solid); border:1px solid var(--line); font-size:12px; line-height:1}
 .hp-fbb:hover{border-color:var(--deo); transform:translateY(-1px)}
+.hp-actrow{display:inline-block; margin-top:7px}
+.hp-act{font-size:11.5px; font-weight:700; padding:5px 12px; border-radius:8px; cursor:pointer;
+  background:color-mix(in srgb,var(--deo) 14%,transparent); color:var(--deo); border:1px solid color-mix(in srgb,var(--deo) 35%,transparent)}
+.hp-act:hover{background:color-mix(in srgb,var(--deo) 24%,transparent)}
 .hp-fbok{font-size:11.5px; color:var(--ok); font-weight:600}
 .hp-sug{display:flex; gap:7px; flex-wrap:wrap; padding:0 14px 10px}
 .hp-chip{font-size:11.5px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--txt2); transition:.15s}
@@ -2088,6 +2092,18 @@ const HELP_KB=[
   a:"New groups get a weekly <b>Presentation</b> deliverable plus <b>Demo Day</b> on the last week and a <b>Final Report</b> — all in the Deliverables section. Edit their weeks/owners like any task."},
  {k:["who is behind","falling behind","behind schedule","on track","red tasks","status colors meaning"],t:"See who's behind",
   a:"Switch the timeline to the <b>Progress</b> view: 🟢 done, 🔴 behind (week passed, not done), 🟡 in progress, 🔵 upcoming. The <b>Schedule</b> card also shows an On-track / Behind badge for the whole project."},
+ {k:["hours per week","hours by week","weekly hours","log hours per week","split hours","week by week","breakdown"],t:"Log hours per week",
+  a:"When you open a task you'll see <b>Logged hours by week</b> — one box for each week the task spans. Enter what you worked each week; the total rolls up automatically and feeds your budget actual hours. Change the task's start/end weeks and the boxes update to match."},
+ {k:["undo","undo delete","restore","bring back","deleted by mistake","accidentally deleted","recover task","get it back"],t:"Undo a delete",
+  a:"Right after you delete a task or a section, an <b>Undo</b> button appears at the bottom for about 5 seconds — click it to bring everything back. After that the delete is final (an admin can restore from a backup)."},
+ {k:["instant","realtime","real time","live update","how fast sync","see changes instantly","update speed"],t:"How live updates work",
+  a:"Changes appear for everyone in your group <b>instantly</b> over a realtime connection. If that ever drops, it falls back to refreshing every few seconds, so you're never out of date. The <b>Live</b> badge shows the connection is healthy."},
+ {k:["conflict","same task","two people edit","edited by someone","overwrite","changed by teammate"],t:"Two people edited the same task",
+  a:"If a teammate changes a task while you're editing the same one, your save is stopped and the latest version loads in so you don't overwrite their work — just re-apply your change. Different tasks never conflict."},
+ {k:["backup","back up","download backup","save a copy","data backup","restore data","json backup"],t:"Backups",
+  a:"Your data is snapshotted automatically every day (kept for two weeks). Admins can also download a full backup anytime from the Admin Console (<b>💾 Backup</b>), or restore an earlier snapshot if something was deleted by mistake."},
+ {k:["change admin passcode","admin password","reset admin","rotate admin","new admin passcode","admin login code"],t:"Change the admin passcode",
+  a:"In the <b>Admin Console</b>, click <b>🔐 Admin passcode</b> to set a new one (you'll confirm it twice). The admin passcode is stored securely and can't be recovered — only changed — so keep the new one somewhere safe."},
 ];
 const HP_STARTERS=["How do I add a task?","How do I log my hours?","How does the budget work?","Register a new group","Forgot my passcode","Export to PDF","Switch to dark mode"];
 let helpStarted=false;
@@ -2103,7 +2119,7 @@ const HP_SYN={ remove:"delete",erase:"delete",rid:"delete",trash:"delete",cancel
   signup:"register",enroll:"register",enrol:"register",join:"register",joining:"register",registering:"register",registration:"register",
   logout:"signout",
   signin:"login",
-  download:"export",print:"export",printing:"export",backup:"export",pdf:"export",csv:"export",exporting:"export",save2:"export",
+  download:"export",print:"export",printing:"export",pdf:"export",csv:"export",exporting:"export",save2:"export",
   administrator:"admin",instructor:"admin",teacher:"admin",professor:"admin",ta:"admin",
   night:"dark",darkmode:"dark",
   tool:"equipment",tools:"equipment",oscilloscope:"equipment",instrument:"equipment",rent:"equipment",rental:"equipment",renting:"equipment",gear:"equipment",
@@ -2126,9 +2142,23 @@ function hpNorm(s){ return (s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").spli
   .filter(w=>w&&!HP_STOP.has(w)).map(w=>HP_SYN[w]||w); }
 HELP_KB.forEach(e=>{ const set=new Set(); e.k.forEach(kw=>hpNorm(kw).forEach(t=>set.add(t))); hpNorm(e.t).forEach(t=>set.add(t)); e._tok=set; });
 const HP_DF={}; HELP_KB.forEach(e=>e._tok.forEach(t=>{HP_DF[t]=(HP_DF[t]||0)+1;}));  // how many topics use each token
+const HP_VOCAB=Object.keys(HP_DF);
+// bounded Levenshtein (early-exit) — tolerates typos AND morphology ("deleted"->"delete", "buget"->"budget")
+function hpLev(a,b,max){ const m=a.length,n=b.length; if(Math.abs(m-n)>max) return max+1;
+  let prev=Array.from({length:n+1},(_,i)=>i);
+  for(let i=1;i<=m;i++){ const cur=[i]; let rmin=i;
+    for(let j=1;j<=n;j++){ const c=a.charCodeAt(i-1)===b.charCodeAt(j-1)?0:1;
+      const v=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+c); cur[j]=v; if(v<rmin)rmin=v; }
+    if(rmin>max) return max+1; prev=cur; }
+  return prev[n]; }
+function hpCorrect(tok){ if(tok.length<4 || HP_DF[tok]) return tok;   // already a known token, or too short to correct
+  const max=tok.length>6?2:1; let best=null,bestD=max+1;
+  for(const v of HP_VOCAB){ if(Math.abs(v.length-tok.length)>max) continue;
+    const d=hpLev(tok,v,max); if(d<bestD){ best=v; bestD=d; if(d===1) break; } }
+  return best||tok; }
 function helpRank(q){
   const raw=" "+(q||"").toLowerCase().replace(/[^a-z0-9 %]/g," ")+" ";
-  const qt=hpNorm(q);
+  const qt=hpNorm(q).map(hpCorrect);
   return HELP_KB.map(e=>{ let s=0;
     e.k.forEach(kw=>{ if(kw.indexOf(" ")>=0 && raw.indexOf(" "+kw+" ")>=0) s+=3; });
     qt.forEach(t=>{ if(e._tok.has(t)) s+= 1/(HP_DF[t]||1); });
@@ -2138,16 +2168,72 @@ function helpMatch(q){ const r=helpRank(q)[0]; return (r&&r.s>=0.24)?r.e:null; }
 function hpAdd(html,who){ const d=document.createElement("div"); d.className="hp-b "+who; d.innerHTML=html; $("#hpMsgs").appendChild(d); $("#hpMsgs").scrollTop=$("#hpMsgs").scrollHeight; return d; }
 function hpSuggest(list){ $("#hpSug").innerHTML=list.map(t=>`<button class="hp-chip">${esc(t)}</button>`).join("");
   document.querySelectorAll("#hpSug .hp-chip").forEach(b=>b.onclick=()=>hpAsk(b.textContent)); }
-function hpAnswer(e){
-  const d=hpAdd(`<b>${esc(e.t)}</b><br>${e.a}<div class="hp-fb"><span>Was this helpful?</span><button class="hp-fbb" data-fb="up" aria-label="Yes, helpful">👍</button><button class="hp-fbb" data-fb="down" aria-label="No, not helpful">👎</button></div>`,"bot");
+function hpBotAnswer(html){
+  const d=hpAdd(`${html}<div class="hp-fb"><span>Was this helpful?</span><button class="hp-fbb" data-fb="up" aria-label="Yes, helpful">👍</button><button class="hp-fbb" data-fb="down" aria-label="No, not helpful">👎</button></div>`,"bot");
   d.querySelectorAll("[data-fb]").forEach(b=>b.onclick=()=>{ const fb=d.querySelector(".hp-fb");
     if(b.dataset.fb==="up"){ fb.innerHTML="<span class='hp-fbok'>Thanks! 🙌</span>"; }
     else { fb.innerHTML="<span class='hp-fbok'>Sorry about that.</span>"; hpAdd("No problem — try wording it differently, or pick one of these:","bot"); hpSuggest(HP_STARTERS.slice(0,5)); }
   });
+  d.querySelectorAll(".hp-act").forEach(b=>b.onclick=()=>hpDoAct(b.dataset.act));
+  return d;
+}
+function hpAnswer(e){ return hpBotAnswer(`<b>${esc(e.t)}</b><br>${e.a}`); }
+function hpDoAct(a){
+  $("#helpPanel").classList.remove("show");
+  try{
+    if(a==="settings"){ const b=$("#settingsBtn"); if(b) b.click(); }
+    else if(a==="budget"){ const t=document.querySelector('.tab[data-view="budget"]'); if(t) t.click(); }
+    else if(a==="timeline"){ const t=document.querySelector('.tab[data-view="timeline"]'); if(t) t.click(); }
+    else if(a==="addtask"){ openTask(null); }
+    else if(a==="export"){ const b=$("#exportBtn"); if(b) b.click(); }
+  }catch(_){}
+}
+/* answers computed from the user's actual project data (still 100% offline) */
+function hpDynamic(q){
+  if(typeof cfg==="undefined" || !cfg || !cfg.weeks || !cfg.weeks.length) return null;
+  const s=" "+(q||"").toLowerCase().replace(/[^a-z0-9 %]/g," ").replace(/\s+/g," ")+" ";
+  const has=(...ws)=>ws.some(w=>s.includes(w));
+  const act=(a,label)=>` <span class="hp-actrow"><button class="hp-act" data-act="${a}">${label}</button></span>`;
+  if(has("who are the member","who is on","who's on","list the member","list member","my team","team members","members are","who is in the","how many member")){
+    const m=memberList();
+    return m.length ? `Your group has <b>${m.length}</b> member${m.length===1?'':'s'}: <b>${m.map(esc).join("</b>, <b>")}</b>.`+act("settings","Manage members")
+                    : "No members are registered yet — add them in Settings."+act("settings","Open Settings");
+  }
+  if(has("how many task","number of task","task count","how many section")){
+    const ns=sectionsOf(tasks).length;
+    return `You have <b>${tasks.length}</b> task${tasks.length===1?'':'s'} across <b>${ns}</b> section${ns===1?'':'s'}.`+act("timeline","Open Timeline");
+  }
+  if(has("overall progress","our progress","my progress","how far along","progress so far","how complete are","how are we doing","what's our progress","what is our progress","percent complete")){
+    const op=tasks.length?Math.round(tasks.reduce((a,t)=>a+(+t.comp||0),0)/tasks.length):0;
+    return `Overall progress is <b>${op}%</b> — the average completion across your ${tasks.length} tasks.`+act("timeline","See the timeline");
+  }
+  if(has("what week","current week","which week are","what week is it","week are we")){
+    const w=cfg.weeks[cfg.now_week]||{};
+    return `It's currently <b>${esc(w.label||"?")}</b>${w.range?` (${esc(w.range)})`:""} — week ${cfg.now_week+1} of ${cfg.weeks.length}.`;
+  }
+  if(has("how many hour","total hour","hours logged","hours so far","logged so far","hours have we")){
+    const tot=tasks.reduce((a,t)=>a+(+t.logged_hours||0),0);
+    return `<b>${Math.round(tot*10)/10}</b> hours have been logged across the timeline so far.`+act("budget","Open Budget");
+  }
+  if(has("total cost","total budget","how much will","how much does","budget total","grand total","total estimate","actual to date","what's the budget","what is the budget")){
+    const c=calcBudget();
+    return `Budget — <b>estimate ${money(c.totalE)}</b>, <b>actual to date ${money(c.totalA)}</b>.`+act("budget","Open Budget");
+  }
+  if(has("how many week","number of week","project length","how long is the project","start and end","project dates","when does the project end","end date","project end")){
+    return `Your project runs <b>${fmtDate(budget.start)}</b> → <b>${fmtDate(budget.end)}</b> (${cfg.weeks.length} weeks).`;
+  }
+  return null;
 }
 function hpAsk(q){ q=(q||"").trim(); if(!q) return; hpAdd(esc(q),"me"); $("#hpInput").value="";
+  const dyn=hpDynamic(q);
   const ranked=helpRank(q), top=ranked[0];
   setTimeout(()=>{
+    if(dyn){
+      hpBotAnswer(dyn);
+      const next=ranked.filter(r=>r.s>=0.2).slice(0,3).map(r=>r.e.t);
+      hpSuggest(next.length?next:HP_STARTERS.slice(0,4));
+      return;
+    }
     if(top && top.s>=0.24){
       hpAnswer(top.e);
       const next=ranked.filter(r=>r.e!==top.e && r.s>=Math.max(0.15, top.s*0.5)).slice(0,3).map(r=>r.e.t);  // genuinely-related follow-ups
