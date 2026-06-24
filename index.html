@@ -1768,7 +1768,9 @@ function exportPDF(){
   const sc=statusColors();
   const leg=[["Done",sc.done],["Behind",sc.behind],["In progress",sc.progress],["Next",sc.next]].map(([l,col])=>`<span class="lg"><i style="background:${col}"></i>${l}</span>`).join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(c.title||'Project')} — Progress & Budget</title>
-  <style>@page{size:landscape;margin:12mm}body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#111;margin:0;padding:18px}
+  <style>@page{size:landscape;margin:12mm}
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}
+  body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#111;margin:0;padding:18px}
   h1{font-size:20px;margin:0 0 2px}.sub{color:#666;font-size:12px;margin:0 0 12px}
   .legend{margin:0 0 12px;font-size:11px}.lg{display:inline-flex;align-items:center;gap:5px;margin-right:14px}.lg i{width:12px;height:12px;border-radius:3px;display:inline-block}
   table.gt{border-collapse:collapse;width:100%;table-layout:fixed;font-size:9px;margin-bottom:20px}
