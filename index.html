@@ -191,6 +191,11 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .sec .cnt{color:var(--mut); font-weight:500; letter-spacing:.02em}
 .sec .secbar{flex:1; max-width:160px; height:6px; border-radius:99px; background:var(--panel2); overflow:hidden; border:1px solid var(--line)}
 .sec .secbar i{display:block;height:100%;background:linear-gradient(90deg,var(--deo),var(--can))}
+.secacts{display:inline-flex; gap:5px; margin-left:6px}
+.secbtn{border:0; background:var(--panel2); color:var(--txt2); border-radius:6px; width:25px; height:25px; font-size:13px; cursor:pointer; line-height:1; transition:.15s; text-transform:none}
+.secbtn:hover{background:color-mix(in srgb,var(--deo) 18%,transparent); color:var(--deo)}
+.secbtn.del:hover{background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad)}
+.addsecrow{padding:12px 14px; background:var(--sec-bg); position:sticky; left:0; display:flex; justify-content:flex-start}
 .track{position:relative; border-bottom:1px solid var(--grid-line); height:38px; grid-column:2/-1}
 .track:nth-of-type(even){background:var(--track-alt)}
 .bar{position:absolute; top:7px; height:24px; border-radius:8px; display:flex; align-items:center; padding:0 9px;
@@ -308,6 +313,9 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .brow.tot{background:var(--panel2); font-weight:800}
 .brow.tot .nm{color:var(--txt); font-weight:800}
 .brow.tot .val{font-size:14px}
+.exbadge{display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.03em; padding:1px 8px; border-radius:999px; vertical-align:middle; margin-left:6px;
+  color:var(--both); background:color-mix(in srgb,var(--both) 16%,transparent); border:1px solid color-mix(in srgb,var(--both) 40%,transparent); text-transform:none}
+.brow .val .exempt{font-size:11px; font-weight:700; color:var(--mut); font-style:italic}
 .brow.grand{background:linear-gradient(90deg,color-mix(in srgb,var(--deo) 12%,transparent),color-mix(in srgb,var(--can) 12%,transparent))}
 .brow.grand .val{font-size:17px; font-weight:900}
 .brow.oh .nm{color:var(--mut); font-style:italic}
@@ -1171,7 +1179,7 @@ function renderGrid(){
   secs.forEach(sec=>{
     const items=list.filter(t=>t.section===sec);
     const sp=items.length?Math.round(items.reduce((s,t)=>s+t.comp,0)/items.length):0;
-    h+=`<div class="sec"><span class="secico">${sectionIcon(sec)}</span><span>${esc(sec)}</span><span class="cnt mono">${items.length}</span><div class="secbar"><i style="width:${sp}%"></i></div><span class="cnt mono">${sp}%</span></div>`;
+    h+=`<div class="sec"><span class="secico">${sectionIcon(sec)}</span><span>${esc(sec)}</span><span class="cnt mono">${items.length}</span><div class="secbar"><i style="width:${sp}%"></i></div><span class="cnt mono">${sp}%</span>${editMode?`<span class="secacts"><button class="secbtn" data-secren="${esc(sec)}" title="Rename section" aria-label="Rename section ${esc(sec)}">✎</button><button class="secbtn del" data-secdel="${esc(sec)}" title="Delete section" aria-label="Delete section ${esc(sec)}">×</button></span>`:''}</div>`;
     items.forEach(t=>{
       const wlab=(cfg.weeks[t.w0]||{}).label, wlab1=(cfg.weeks[t.w1]||{}).label;
       h+=`<div class="namecell" tabindex="0" role="button" data-tid="${t.id}" aria-label="Task: ${esc(t.name)}, owner ${esc(ownerLabel(t.owner))}, ${t.comp}% complete, weeks ${esc(wlab||'')} to ${esc(wlab1||'')}. Press Enter to edit."${editMode?` draggable="true" data-drag="${t.id}"`:''}>${editMode?'<span class="drag" aria-hidden="true">⠿</span>':''}<span class="d" style="background:${ownerColor(t.owner)}" aria-hidden="true"></span><span class="nm" title="${esc(t.name)} · ${esc(ownerLabel(t.owner))}">${esc(t.name)}</span>
@@ -1192,10 +1200,14 @@ function renderGrid(){
     });
   });
   if(!list.length) h+=`<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--mut)">No tasks match your filter.</div>`;
+  if(editMode) h+=`<div class="addsecrow" style="grid-column:1/-1"><button class="badd" id="addSecBtn" type="button">+ Add section</button></div>`;
   grid.innerHTML=h;
   $(".gwrap").classList.toggle("editing",editMode);
   grid.querySelectorAll("[data-edit]").forEach(el=>el.onclick=e=>{ if(editMode||el.classList.contains("mini")){e.stopPropagation();openTask(el.dataset.edit);} });
   grid.querySelectorAll("[data-del]").forEach(el=>el.onclick=e=>{e.stopPropagation();delTask(el.dataset.del);});
+  grid.querySelectorAll("[data-secren]").forEach(el=>el.onclick=e=>{e.stopPropagation();renameSection(el.dataset.secren);});
+  grid.querySelectorAll("[data-secdel]").forEach(el=>el.onclick=e=>{e.stopPropagation();deleteSection(el.dataset.secdel);});
+  { const asb=$("#addSecBtn"); if(asb) asb.onclick=addSection; }
   grid.querySelectorAll("[data-tip]").forEach(el=>{
     el.addEventListener("mousemove",ev=>showBarTip(el.dataset.tip,ev));
     el.addEventListener("mouseleave",hideTip);
@@ -1335,6 +1347,33 @@ function upsertLocal(saved){ const i=tasks.findIndex(x=>x.id===saved.id);
   saved={...saved,comp:+saved.comp,w0:+saved.w0,w1:+saved.w1,est_hours:+saved.est_hours,logged_hours:+saved.logged_hours,sort_order:+saved.sort_order};
   if(i>=0)tasks[i]=saved; else tasks.push(saved); }
 
+/* ---- section management (edit mode) ---- */
+async function renameSection(sec){
+  const nn=prompt(`Rename section "${sec}" to:`, sec); if(nn==null) return;
+  const name=nn.trim(); if(!name || name===sec) return;
+  const affected=tasks.filter(t=>t.section===sec); if(!affected.length) return;
+  setSync("saving");
+  try{ for(const t of affected){ t.section=name; const saved=await apiSave({...t}); upsertLocal(saved); }
+       renderAll(); toast(`Section renamed to "${name}"`); setSync("live"); }
+  catch(e){ setSync("off"); alert(err(e)); }
+}
+async function deleteSection(sec){
+  const affected=tasks.filter(t=>t.section===sec);
+  if(!confirm(`Delete section "${sec}" and its ${affected.length} task${affected.length===1?'':'s'}? This cannot be undone.`)) return;
+  setSync("saving");
+  try{ for(const t of affected){ await apiDelete(t.id); }
+       tasks=tasks.filter(t=>t.section!==sec); renderAll(); toast("Section deleted"); setSync("live"); }
+  catch(e){ setSync("off"); alert(err(e)); }
+}
+function addSection(){
+  const nn=prompt("Name the new section (e.g. Backend, Frontend, Setup & Planning):"); if(nn==null) return;
+  const name=nn.trim(); if(!name) return;
+  if(sectionsOf(tasks).some(s=>s.toLowerCase()===name.toLowerCase())) toast("That section already exists — add a task to it below");
+  openTask(null);
+  $("#f_section").value=name;
+  setTimeout(()=>$("#f_name").focus(),50);
+}
+
 /* ====================== SETTINGS ====================== */
 $("#settingsBtn").onclick=()=>{ modalOpen=true; $("#sErr").textContent=""; $("#s_old").value="";$("#s_new").value="";
   $("#s_title").value=cfg.title; $("#s_sub").value=cfg.subtitle; $("#s_now").value=cfg.now_week;
@@ -1456,12 +1495,18 @@ function calcBudget(){
   const TDMa=M.reduce((s,r)=>s+num(r.a),0), TDMe=M.reduce((s,r)=>s+num(r.e),0);
   const days=projectDays();
   // equipment rental = value × (rate% per day) × project days — an ESTIMATE only;
-  // it is not part of "actual to date" (Direct + contract + materials + overhead spent so far)
-  const ETRMe=R.reduce((s,r)=>s+num(r.value)*(num(r.rate)/100)*days,0), ETRMa=0;
+  // it is not part of "actual to date" (Direct + contract + materials + overhead spent so far).
+  // The Software Engineering Lab class is EXEMPT from the equipment rental fee; every other
+  // class must include the Estimated Total Rental (ETRM) in the final budget.
+  const ETRMexempt=rentalExempt();
+  const ETRMeRaw=R.reduce((s,r)=>s+num(r.value)*(num(r.rate)/100)*days,0);
+  const ETRMe=ETRMexempt?0:ETRMeRaw, ETRMa=0;
   const subA=TDLa+TCLa+TDMa+ETRMa, subE=TDLe+TCLe+TDMe+ETRMe, boh=num(b.bizOhRate);
   const bizA=subA*boh, bizE=subE*boh;
-  return {DLa,DLe,TDLa,TDLe,TCLa,TCLe,TDMa,TDMe,ETRMa,ETRMe,subA,subE,bizA,bizE,totalA:subA+bizA,totalE:subE+bizE,loh,boh};
+  return {DLa,DLe,TDLa,TDLe,TCLa,TCLe,TDMa,TDMe,ETRMa,ETRMe,ETRMeRaw,ETRMexempt,subA,subE,bizA,bizE,totalA:subA+bizA,totalE:subE+bizE,loh,boh};
 }
+// Software Engineering Lab is exempt from the equipment rental fee; all other classes include ETRM.
+function rentalExempt(){ return ((cfg.class_name||cfg.title||"")).toLowerCase().includes("software engineering"); }
 function projectDays(){ const s=new Date(budget.start),e=new Date(budget.end); if(isNaN(s)||isNaN(e)||e<s) return 1; return Math.max(1,Math.round((e-s)/86400000)); }
 function liveToday(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 // Parse a YYYY-MM-DD string as a LOCAL date (avoid JS's UTC-midnight off-by-one)
@@ -1554,17 +1599,19 @@ function renderBudget(){
 
   // ---- Equipment Rental (0.2% of value per day × project days) ----
   const days=projectDays();
-  h+=`<div class="btable"><div class="bth"><div class="cat">Equipment Rental <span style="text-transform:none;letter-spacing:0;color:var(--mut);font-weight:600">· ${days} days</span></div><div class="col act">Purchase value</div><div class="col">Rental cost</div></div>`;
+  const exempt=c.ETRMexempt;
+  const exBadge=exempt?` <span class="exbadge" title="Software Engineering Lab is exempt from the equipment rental fee">Exempt · SE Lab</span>`:"";
+  h+=`<div class="btable"><div class="bth"><div class="cat">Equipment Rental <span style="text-transform:none;letter-spacing:0;color:var(--mut);font-weight:600">· ${days} days</span>${exBadge}</div><div class="col act">Purchase value</div><div class="col">Rental cost</div></div>`;
   (budget.rental||[]).forEach((r,i)=>{
     const cost=num(r.value)*(num(r.rate)/100)*days;
     h+=`<div class="brow"><div class="nm">${e?inp("rental",i,"name",r.name,"nm"):esc(r.name||"—")}
         <span class="sub">${e?`rate ${inp("rental",i,"rate",r.rate)}%/day`:`${num(r.rate)}%/day`}</span></div>
       <div class="val act">${e?inp("rental",i,"value",r.value):money(r.value)}</div>
-      <div class="val">${money(cost)}${e?`<button class="bdel" data-del="rental" data-idx="${i}">×</button>`:""}</div></div>`;
+      <div class="val">${exempt?`<span class="exempt" title="Exempt for Software Engineering Lab">exempt</span>`:money(cost)}${e?`<button class="bdel" data-del="rental" data-idx="${i}">×</button>`:""}</div></div>`;
   });
   if(e) h+=`<div class="baddrow"><button class="badd" data-add="rental">+ Add equipment</button></div>`;
   if(!(budget.rental||[]).length && !e) h+=`<div class="brow"><div class="nm sub">No equipment rental</div><div class="val act">—</div><div class="val">$0.00</div></div>`;
-  h+=`<div class="brow tot"><div class="nm">Estimated Total Rental (ETRM)</div><div class="val act"></div><div class="val">${money(c.ETRMe)}</div></div></div>`;
+  h+=`<div class="brow tot"><div class="nm">Estimated Total Rental (ETRM)${exempt?` <span class="sub" style="font-weight:600">— not charged to SE Lab</span>`:` <span class="sub" style="font-weight:600">— included in final budget</span>`}</div><div class="val act"></div><div class="val">${exempt?`$0.00`:money(c.ETRMe)}</div></div></div>`;
 
   // ---- Totals ----
   h+=`<div class="btable">${head("Project Total")}
@@ -1668,9 +1715,10 @@ function exportMarkdown(){
   (budget.material||[]).forEach(r=>{ m+=`| ${mdEsc(r.name)} | ${money(r.a)} | ${money(r.e)} |\n`; });
   m+=`| **Total Materials** | **${money(b.TDMa)}** | **${money(b.TDMe)}** |\n\n`;
   if((budget.rental||[]).length){
-    m+=`### Equipment Rental (${projectDays()} days @ rate%/day)\n\n| Item | Value | Rate/day | Cost |\n|---|---|---|---|\n`;
-    (budget.rental||[]).forEach(r=>{ m+=`| ${mdEsc(r.name||"—")} | ${money(r.value)} | ${num(r.rate)}% | ${money(num(r.value)*(num(r.rate)/100)*projectDays())} |\n`; });
-    m+=`| **Total Rental** |  |  | **${money(b.ETRMe)}** |\n\n`;
+    const exT=b.ETRMexempt?" — EXEMPT (Software Engineering Lab)":"";
+    m+=`### Equipment Rental (${projectDays()} days @ rate%/day)${exT}\n\n| Item | Value | Rate/day | Cost |\n|---|---|---|---|\n`;
+    (budget.rental||[]).forEach(r=>{ m+=`| ${mdEsc(r.name||"—")} | ${money(r.value)} | ${num(r.rate)}% | ${b.ETRMexempt?"exempt":money(num(r.value)*(num(r.rate)/100)*projectDays())} |\n`; });
+    m+=`| **Total Rental (ETRM)** |  |  | **${money(b.ETRMe)}** |\n\n`;
   }
   m+=`### Totals\n\n| | Actual | Estimate |\n|---|---|---|\n`;
   m+=`| Subtotal (TDL + TCL + TDM + ETRM) | ${money(b.subA)} | ${money(b.subE)} |\n`;
@@ -1696,8 +1744,8 @@ function budgetHTML(){
   let mr=(budget.material||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${money(r.a)}</td><td>${money(r.e)}</td></tr>`).join('');
   h+=tbl('Direct Materials',['Item','Actual','Estimate'],mr,`<tr class="tt"><td>Total Materials</td><td>${money(b.TDMa)}</td><td>${money(b.TDMe)}</td></tr>`);
   if((budget.rental||[]).length){ const days=projectDays();
-    let rr=(budget.rental||[]).map(r=>`<tr><td>${esc(r.name||'—')}</td><td>${money(r.value)}</td><td>${num(r.rate)}%</td><td>${money(num(r.value)*(num(r.rate)/100)*days)}</td></tr>`).join('');
-    h+=tbl(`Equipment Rental (${days} days @ rate%/day)`,['Item','Value','Rate/day','Cost'],rr,`<tr class="tt"><td>Total Rental</td><td></td><td></td><td>${money(b.ETRMe)}</td></tr>`); }
+    let rr=(budget.rental||[]).map(r=>`<tr><td>${esc(r.name||'—')}</td><td>${money(r.value)}</td><td>${num(r.rate)}%</td><td>${b.ETRMexempt?'exempt':money(num(r.value)*(num(r.rate)/100)*days)}</td></tr>`).join('');
+    h+=tbl(`Equipment Rental (${days} days @ rate%/day)${b.ETRMexempt?' — EXEMPT (SE Lab)':''}`,['Item','Value','Rate/day','Cost'],rr,`<tr class="tt"><td>Total Rental (ETRM)</td><td></td><td></td><td>${money(b.ETRMe)}</td></tr>`); }
   h+=tbl('Totals',['','Actual','Estimate'],
     `<tr><td>Subtotal</td><td>${money(b.subA)}</td><td>${money(b.subE)}</td></tr><tr class="oh"><td>Business overhead (${Math.round(b.boh*100)}%)</td><td>${money(b.bizA)}</td><td>${money(b.bizE)}</td></tr>`,
     `<tr class="tt big"><td>Total Cost</td><td>${money(b.totalA)}</td><td>${money(b.totalE)}</td></tr>`);
@@ -1810,8 +1858,8 @@ const HELP_KB=[
   a:"In the <b>Budget</b> (Edit mode) you can type into a member's <b>actual hours</b> to correct a mistake — it overrides the timeline total. The <span class='hk'>↻</span> button resets it back to the timeline sum."},
  {k:["materials","parts","supplies"],t:"Materials",
   a:"<b>Direct Materials</b> are charged at purchase price. Edit the Actual/Estimate columns, or add lines with <b>+ Add material line</b>."},
- {k:["equipment","rental","oscilloscope","per day","0.2"],t:"Equipment rental",
-  a:"Equipment is charged <b>0.2% of its value per day</b> × the project's days. Enter each item's value and rate; the rental cost computes automatically (counts toward the <b>estimate</b>)."},
+ {k:["equipment","rental","oscilloscope","per day","0.2","etrm","exempt"],t:"Equipment rental",
+  a:"Equipment is charged <b>0.2% of its value per day</b> × the project's days (parts are charged at purchase price). Enter each item's value and rate; the rental cost computes automatically. The <b>Estimated Total Rental (ETRM)</b> is included in your final budget — <b>except</b> for the <b>Software Engineering Lab</b> class, which is exempt (its ETRM shows as $0)."},
  {k:["overhead","markup"],t:"Overhead",
   a:"Labor gets a <b>100% overhead</b> on wages. A separate business-overhead % sits on the Project Total row (0% by default for labs)."},
  {k:["actual to date","spent so far"],t:"Actual to date",
@@ -1836,8 +1884,8 @@ const HELP_KB=[
   a:"Everything is <b>shared & live</b> — anyone in your group with the passcode sees the same data, and edits sync within a few seconds."},
  {k:["admin","manage groups","suspend","governance","audit","registration code"],t:"Admin controls",
   a:"Sign in with the <b>admin passcode</b> for the console: view any group, manage members, reset passcodes, set budget limits, suspend, delete, rename, see the <b>audit log</b>, export CSV, and set a <b>registration code</b>."},
- {k:["section","sections","categories"],t:"Sections",
-  a:"Tasks are grouped into <b>sections</b> (Setup, Design, Development, Testing, Deliverables…), each with its own progress and icon. Add a task to a new section just by typing a new section name."},
+ {k:["section","sections","categories","rename section","add section","delete section","backend","frontend"],t:"Sections",
+  a:"Tasks are grouped into <b>sections</b> (e.g. Setup &amp; Planning, Backend, Frontend, Testing, Deliverables), each with its own progress and icon. Turn on <b>Edit</b> to manage them: click <b>+ Add section</b> at the bottom of the timeline to create one, or use the <b>✎</b> (rename) and <b>×</b> (delete) buttons on any section header. Renaming updates every task in that section; deleting removes the section and its tasks. You can also move a task between sections by dragging it, or by changing its Section field."},
  {k:["search","filter","find task"],t:"Search & filter",
   a:"Use the <b>Search</b> box to find tasks by name, and the owner <b>chips</b> to filter by member or Shared."},
  {k:["shared","what is shared","both","group task","everyone","team task"],t:"What \"Shared\" means",
