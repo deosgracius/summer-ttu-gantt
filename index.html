@@ -421,6 +421,12 @@ button{font-family:var(--font); cursor:pointer; border:0}
 .exmenu{position:fixed; z-index:120; background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--card-shadow-hover); padding:6px; min-width:230px; animation:fade .12s}
 .exmenu button{display:block; width:100%; text-align:left; padding:9px 12px; border-radius:7px; font-size:12.5px; font-weight:500; background:transparent; color:var(--txt2)}
 .exmenu button:hover{background:var(--panel2); color:var(--txt)}
+.adminmenu-wrap{position:relative}
+.adminmenu{position:absolute; right:0; top:calc(100% + 8px); display:none; flex-direction:column; gap:4px;
+  background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:11px; padding:6px;
+  box-shadow:var(--card-shadow-hover); z-index:120; min-width:190px; animation:fade .12s}
+.adminmenu.show{display:flex}
+.adminmenu .tbtn{justify-content:flex-start; width:100%}
 .bresync{border:1px solid var(--line-strong); background:var(--input-bg); color:var(--mut); border-radius:6px; width:24px; height:24px; font-size:13px; margin-left:4px; vertical-align:middle}
 .bresync:hover{color:var(--deo); border-color:var(--deo)}
 .abadge{display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.03em; padding:1px 7px; border-radius:999px; vertical-align:middle; margin-left:4px}
@@ -595,12 +601,17 @@ input:focus-visible,select:focus-visible{outline:none}
       <div class="ttl"><h1>Admin Console</h1><div class="sub" id="adminSub">All project groups</div></div>
     </div>
     <div class="spacer"></div>
-    <button class="tbtn" id="adminRegCode" title="Registration code">🔑 Reg code</button>
-    <button class="tbtn" id="adminChangePass" title="Change the admin passcode">🔐 Admin passcode</button>
-    <button class="tbtn" id="adminPurge" title="Auto-delete groups after the semester ends">🧹 Auto-cleanup</button>
-    <button class="tbtn" id="adminExportAll" title="Export all groups as CSV">⬇ Export CSV</button>
-    <button class="tbtn" id="adminBackup" title="Download a full JSON backup of every group, task, member and budget">💾 Backup</button>
-    <button class="tbtn" id="adminAudit" title="Audit log">📜 Audit log</button>
+    <div class="adminmenu-wrap">
+      <button class="tbtn" id="adminMenuBtn" title="Admin tools" aria-haspopup="true" aria-expanded="false">⚙ Manage <span style="font-size:10px">▾</span></button>
+      <div class="adminmenu" id="adminMenu" role="menu">
+        <button class="tbtn" id="adminRegCode" title="Registration code">🔑 Reg code</button>
+        <button class="tbtn" id="adminChangePass" title="Change the admin passcode">🔐 Admin passcode</button>
+        <button class="tbtn" id="adminPurge" title="Auto-delete groups after the semester ends">🧹 Auto-cleanup</button>
+        <button class="tbtn" id="adminExportAll" title="Export all groups as CSV">⬇ Export CSV</button>
+        <button class="tbtn" id="adminBackup" title="Download a full JSON backup of every group, task, member and budget">💾 Backup</button>
+        <button class="tbtn" id="adminAudit" title="Audit log">📜 Audit log</button>
+      </div>
+    </div>
     <button class="tbtn" id="adminThemeBtn" title="Toggle theme"></button>
     <button class="tbtn" id="adminLogout"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out</button>
   </div>
@@ -1059,6 +1070,14 @@ $("#adminPurge").onclick=async()=>{
     toast(days>0 ? ("Auto-cleanup: "+days+" days after class ends") : "Auto-cleanup turned off"); }
   catch(e){ alert(err(e)); }
 };
+
+/* ---- admin tools dropdown ---- */
+$("#adminMenuBtn").onclick=(e)=>{ e.stopPropagation();
+  const open=$("#adminMenu").classList.toggle("show");
+  $("#adminMenuBtn").setAttribute("aria-expanded", open?"true":"false"); };
+$("#adminMenu").addEventListener("click",()=>{ $("#adminMenu").classList.remove("show"); $("#adminMenuBtn").setAttribute("aria-expanded","false"); });
+document.addEventListener("click",(e)=>{ const w=$(".adminmenu-wrap");
+  if(w && !w.contains(e.target)){ $("#adminMenu").classList.remove("show"); const b=$("#adminMenuBtn"); if(b) b.setAttribute("aria-expanded","false"); } });
 async function adminOpen(gid){
   try{
     const d=await apiAdminOpen(PASS,gid);
