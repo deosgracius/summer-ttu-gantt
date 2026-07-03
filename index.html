@@ -104,6 +104,18 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 /* app boot cascade on sign-in */
 #app.app-enter .topbar{animation:floatUp .5s var(--ease-out) both}
 #app.app-enter .tabs{animation:floatUp .5s var(--ease-out) both; animation-delay:.09s}
+/* gantt bars slide in and their progress fill grows on reveal */
+@keyframes barIn{from{opacity:0;transform:translateX(-7px)}to{opacity:1;transform:none}}
+@keyframes growX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.view-in .bar{animation:barIn .5s var(--ease-out) both}
+.view-in .bar .fill{transform-origin:left center; animation:growX .8s var(--ease-out) both; animation-delay:.12s}
+.view-in .pcell{animation:barIn .46s var(--ease-out) both}
+/* skeleton shimmer (async loads) */
+.skel{background:linear-gradient(100deg,var(--panel2) 28%,color-mix(in srgb,var(--txt) 9%,var(--panel2)) 50%,var(--panel2) 72%);
+  background-size:220% 100%; animation:shimmer 1.25s ease-in-out infinite; border-radius:8px}
+.skrow{height:40px; margin:8px 0}
+/* celebration confetti */
+.confetti{position:fixed; width:9px; height:9px; border-radius:2px; pointer-events:none; z-index:400; will-change:transform,opacity}
 /* richer card interaction */
 .card{will-change:transform}
 .card:hover{box-shadow:var(--card-shadow-hover), 0 0 0 1px color-mix(in srgb,var(--deo) 20%,transparent)}
@@ -1041,7 +1053,7 @@ $("#am_savedetails").onclick=()=>amDo(()=>apiAdminUpdateGroup(PASS,amGid,$("#am_
 
 /* ---- audit log ---- */
 $("#adminAudit").onclick=async()=>{
-  $("#auditList").innerHTML=`<div class="hint">Loading…</div>`; $("#auditModal").classList.add("show"); modalOpen=true;
+  $("#auditList").innerHTML=`<div style="padding:4px 2px">${'<div class="skel skrow"></div>'.repeat(6)}</div>`; $("#auditModal").classList.add("show"); modalOpen=true;
   try{ const rows=await apiAdminAudit(PASS,200);
     const icon={register:"🆕",delete_group:"🗑",suspend:"⛔",unsuspend:"✅",add_member:"➕",remove_member:"➖",reset_passcode:"🔑",budget_limit:"💰",edit_group:"✏️",reg_code_set:"🔐",admin_login:"🔓",admin_passcode_change:"🔐",auto_purge:"🧹",set_purge:"🧹"};
     $("#auditList").innerHTML = rows.length ? `<div class="auditrows">`+rows.map(r=>`<div class="arow2"><span class="ai">${icon[r.action]||"•"}</span><div><div class="aa">${esc(r.action.replace(/_/g,' '))}${r.group_name?` · <b>${esc(r.group_name)}</b>`:""}</div><div class="ad">${r.detail?esc(r.detail)+" · ":""}${new Date(r.at).toLocaleString()}${r.ip?` · <span class="aip">IP ${esc(r.ip)}</span>`:""}</div></div></div>`).join("")+`</div>` : `<div class="hint">No activity yet.</div>`;
@@ -1291,6 +1303,29 @@ function animateCounts(){
       if(p<1) requestAnimationFrame(step); else el.textContent=fmt(to); })(t0);
   });
 }
+/* ---- celebration: confetti burst (used when a task hits 100%) ---- */
+function confettiBurst(x, y, big){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const colors=["#3f62dd","#8b5cf6","#e0922b","#16a34a","#ec4899","#06b6d4"];
+  const n = big?34:18;
+  for(let i=0;i<n;i++){
+    const p=document.createElement("div"); p.className="confetti";
+    p.style.background=colors[i%colors.length];
+    if(i%3===0) p.style.borderRadius="50%";
+    p.style.left=x+"px"; p.style.top=y+"px";
+    const ang=Math.random()*Math.PI*2, dist=(big?90:60)+Math.random()*(big?150:100);
+    const dx=Math.cos(ang)*dist, dy=Math.sin(ang)*dist-50;
+    document.body.appendChild(p);
+    p.animate([
+      {transform:"translate(0,0) rotate(0deg)", opacity:1},
+      {transform:`translate(${dx}px,${dy}px) rotate(${(Math.random()*540)|0}deg)`, opacity:1, offset:.65},
+      {transform:`translate(${dx*1.1}px,${dy+180}px) rotate(${(Math.random()*760)|0}deg)`, opacity:0}
+    ], {duration:1000+Math.random()*500, easing:"cubic-bezier(.2,.7,.3,1)"});
+    setTimeout(()=>p.remove(), 1600);
+  }
+}
+function celebrate(big){ confettiBurst(innerWidth/2, innerHeight*0.34, big);
+  toast(big?"🏆 Project complete — every task done!":"🎉 Task complete!"); }
 
 /* ====================== RENDER: CHIPS ====================== */
 function renderChips(){
@@ -1521,8 +1556,11 @@ $("#tmSave").onclick=async()=>{
     comp:+$("#f_comp").value, w0, w1, est_hours:+$("#f_est").value||0, logged_hours:loggedSum, hours_by_week:hbw,
     sort_order: t? t.sort_order : (Math.max(0,...tasks.map(x=>x.sort_order))+1) };
   if(t && t.updated_at) rec.updated_at = t.updated_at;   // optimistic-concurrency token
+  const prevComp = t? (+t.comp||0) : 0;
   const btn=$("#tmSave");btn.disabled=true;btn.textContent="Saving…";setSync("saving");
-  try{ const saved=await apiSave(rec); upsertLocal(saved); closeTask(); renderAll(); toast(editingId?"Task updated":"Task added"); setSync("live");
+  try{ const saved=await apiSave(rec); upsertLocal(saved); closeTask(); renderAll(); setSync("live");
+    if(rec.comp>=100 && prevComp<100){ const all = tasks.length && tasks.every(x=>(+x.comp||0)>=100); celebrate(all); }
+    else toast(editingId?"Task updated":"Task added");
   }catch(e){
     if(String((e&&e.message)||e).toLowerCase().includes("conflict")){
       $("#tmErr").textContent="A teammate just changed this task. Loading their latest version…";
