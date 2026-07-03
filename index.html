@@ -84,7 +84,30 @@ input,select,textarea,.bin,.notus-input,.search{transition:border-color var(--t-
 input:focus,select:focus,textarea:focus,.bin:focus,.notus-input:focus{box-shadow:var(--ring); border-color:color-mix(in srgb,var(--deo) 55%,var(--line-strong)); outline:none}
 .tbtn:hover,.chip:hover{transform:translateY(-1px)}
 button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:active,.notus-btn:active{transform:translateY(.5px) scale(.98)}
-@media (prefers-reduced-motion:reduce){*{transition-duration:.001ms !important; animation-duration:.001ms !important} button:active,.card:hover{transform:none !important}}
+/* entrance / view-transition / modal choreography */
+@keyframes reveal{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes revealPop{0%{opacity:0;transform:translateY(13px) scale(.985)}100%{opacity:1;transform:none}}
+@keyframes modalPop{0%{opacity:0;transform:translateY(14px) scale(.965)}100%{opacity:1;transform:none}}
+@keyframes shimmer{0%{background-position:-160% 0}100%{background-position:160% 0}}
+@keyframes floatUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.view-in{animation:reveal .44s var(--ease-out) both}
+.view-in .dash>.card,.view-in .bdash>.card,.view-in .btable{animation:revealPop .52s var(--ease-out) both}
+.view-in .dash>.card:nth-child(2),.view-in .bdash>.card:nth-child(2){animation-delay:.05s}
+.view-in .dash>.card:nth-child(3),.view-in .bdash>.card:nth-child(3){animation-delay:.1s}
+.view-in .dash>.card:nth-child(4){animation-delay:.15s}
+.view-in .dash>.card:nth-child(5){animation-delay:.2s}
+.view-in .btable:nth-of-type(2){animation-delay:.06s}
+.view-in .btable:nth-of-type(3){animation-delay:.12s}
+.view-in .btable:nth-of-type(4){animation-delay:.18s}
+.view-in .gwrap{animation:floatUp .5s var(--ease-out) both; animation-delay:.08s}
+.modal.show .sheet{animation:modalPop .36s var(--spring) both}
+/* app boot cascade on sign-in */
+#app.app-enter .topbar{animation:floatUp .5s var(--ease-out) both}
+#app.app-enter .tabs{animation:floatUp .5s var(--ease-out) both; animation-delay:.09s}
+/* richer card interaction */
+.card{will-change:transform}
+.card:hover{box-shadow:var(--card-shadow-hover), 0 0 0 1px color-mix(in srgb,var(--deo) 20%,transparent)}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.001ms !important; animation-duration:.001ms !important; animation-delay:0 !important} button:active,.card:hover{transform:none !important}}
 
 /* ============ GATE · Notus auth on "Background Paths" ============ */
 #gate{position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px;
@@ -887,7 +910,9 @@ async function tryUnlock(p){
     PASS=p; const d=await apiLogin(p); sessionStorage.setItem("eh_pass",p);
     $("#gate").style.display="none";
     if(d.admin){ adminRegCodeVal=d.reg_code||""; adminPurgeDays=(d.purge_after_days==null?null:+d.purge_after_days); enterAdmin(d.groups); announce("Signed in as administrator."); }
-    else { isAdminMode=false; apply(d); $("#app").style.display=""; startPolling(); announce("Signed in to "+(cfg.title||"your project")+"."); }
+    else { isAdminMode=false; apply(d); $("#app").style.display=""; startPolling();
+      const ap=$("#app"); ap.classList.add("app-enter"); setTimeout(()=>ap.classList.remove("app-enter"),1100); playViewIn($("#viewTimeline"));
+      announce("Signed in to "+(cfg.title||"your project")+"."); }
   }catch(e){
     PASS=""; sessionStorage.removeItem("eh_pass");
     $("#gateerr").textContent = /suspend/i.test(e.message||"") ? e.message
@@ -1665,6 +1690,9 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ====================== TABS ====================== */
+// re-trigger entrance choreography on a container (auto-clears so background re-renders don't replay)
+function playViewIn(el){ if(!el) return; el.classList.remove("view-in"); void el.offsetWidth; el.classList.add("view-in");
+  clearTimeout(el._vt); el._vt=setTimeout(()=>el.classList.remove("view-in"), 900); }
 function setView(v){ curView=v;
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view===v));
   $("#viewTimeline").style.display = v==="timeline"?"":"none";
@@ -1672,6 +1700,7 @@ function setView(v){ curView=v;
   $("#addBtn").style.display = v==="timeline"?"":"none";
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected", t.dataset.view===v?"true":"false"));
   if(v==="timeline" && $("#grid").children.length) placeOverlay();
+  playViewIn(v==="budget"?$("#viewBudget"):$("#viewTimeline"));
   announce(v==="budget"?"Budget view":"Timeline view");
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>setView(t.dataset.view));
