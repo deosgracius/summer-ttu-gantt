@@ -59,15 +59,22 @@
 html,body{margin:0;padding:0}
 body{
   background:
-    radial-gradient(var(--dot) 1px, transparent 1.4px) 0 0 / 24px 24px,
-    radial-gradient(1100px 600px at 100% -5%, color-mix(in srgb,var(--can) 7%,transparent), transparent 60%),
-    radial-gradient(1000px 560px at -5% 0%, color-mix(in srgb,var(--deo) 6%,transparent), transparent 55%),
+    radial-gradient(var(--dot) 1px, transparent 1.4px) 0 0 / 26px 26px,
     linear-gradient(180deg,var(--bg),var(--bg2));
   background-attachment:fixed;
   color:var(--txt); font-family:var(--font); min-height:100vh; font-size:14px;
   -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
   letter-spacing:-0.011em; text-rendering:optimizeLegibility; font-variant-numeric:tabular-nums;
 }
+/* living aurora — soft single-accent glows that slowly drift (sits behind app, above base bg) */
+body::before{content:""; position:fixed; inset:-25%; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(46% 42% at 14% 10%, color-mix(in srgb,var(--deo) 16%,transparent), transparent 60%),
+    radial-gradient(50% 44% at 88% 4%, color-mix(in srgb,var(--deo) 11%,transparent), transparent 62%),
+    radial-gradient(42% 40% at 74% 92%, color-mix(in srgb,var(--can) 9%,transparent), transparent 60%);
+  filter:saturate(1.05); animation:auroraDrift 30s var(--ease) infinite alternate;}
+@keyframes auroraDrift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(-3%,2.5%,0) scale(1.07)}100%{transform:translate3d(2.5%,-2%,0) scale(1.04)}}
+@media (prefers-reduced-motion:reduce){body::before{animation:none}}
 .mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
 .wrap{max-width:var(--maxw); margin:0 auto; padding:22px clamp(14px,3.2vw,40px) 70px}
 button{font-family:var(--font); cursor:pointer; border:0}
@@ -110,6 +117,11 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .view-in .bar{animation:barIn .5s var(--ease-out) both}
 .view-in .bar .fill{transform-origin:left center; animation:growX .8s var(--ease-out) both; animation-delay:.12s}
 .view-in .pcell{animation:barIn .46s var(--ease-out) both}
+/* NOW line sweeps in and its tag gently pulses */
+.view-in .nowcol{animation:nowIn .8s var(--ease-out) both; animation-delay:.22s}
+@keyframes nowIn{from{opacity:0}to{opacity:1}}
+.nowtag{animation:nowPulse 2.8s ease-in-out infinite}
+@keyframes nowPulse{0%,100%{box-shadow:0 2px 8px -2px color-mix(in srgb,var(--ok) 42%,transparent)}50%{box-shadow:0 3px 16px 1px color-mix(in srgb,var(--ok) 62%,transparent)}}
 /* skeleton shimmer (async loads) */
 .skel{background:linear-gradient(100deg,var(--panel2) 28%,color-mix(in srgb,var(--txt) 9%,var(--panel2)) 50%,var(--panel2) 72%);
   background-size:220% 100%; animation:shimmer 1.25s ease-in-out infinite; border-radius:8px}
@@ -276,8 +288,10 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .namecell .acts{display:flex; gap:4px; margin-left:6px}
 
 /* ============ TOOLTIP ============ */
-#tip{position:fixed; z-index:120; max-width:330px; background:var(--panel-solid); border:1px solid var(--line-strong); border-radius:14px;
-  padding:13px 15px; box-shadow:var(--card-shadow); font-size:12px; pointer-events:none; opacity:0; transition:opacity .12s; backdrop-filter:blur(20px)}
+#tip{position:fixed; z-index:120; max-width:330px; background:color-mix(in srgb,var(--panel-solid) 88%,transparent); border:1px solid var(--line-strong); border-radius:14px;
+  padding:13px 15px; box-shadow:var(--card-shadow-hover); font-size:12px; pointer-events:none; opacity:0; transform:translateY(7px) scale(.97);
+  transition:opacity .16s var(--ease-out), transform .16s var(--ease-out); backdrop-filter:blur(22px) saturate(1.3)}
+#tip.tipvis{opacity:1; transform:none}
 #tip h4{margin:0 0 9px; font-size:12.5px; display:flex; justify-content:space-between; gap:10px}
 #tip h4 span{color:var(--mut); font-weight:500}
 #tip .grp{margin:8px 0 0}
@@ -1377,17 +1391,17 @@ function renderGrid(){
     h+=`<div class="sec"><span class="secico">${sectionIcon(sec)}</span><span>${esc(sec)}</span><span class="cnt mono">${items.length}</span><div class="secbar"><i style="width:${sp}%"></i></div><span class="cnt mono">${sp}%</span>${editMode?`<span class="secacts"><button class="secbtn" data-secren="${esc(sec)}" title="Rename section" aria-label="Rename section ${esc(sec)}">✎</button><button class="secbtn del" data-secdel="${esc(sec)}" title="Delete section" aria-label="Delete section ${esc(sec)}">×</button></span>`:''}</div>`;
     items.forEach(t=>{
       const wlab=(cfg.weeks[t.w0]||{}).label, wlab1=(cfg.weeks[t.w1]||{}).label;
-      h+=`<div class="namecell" tabindex="0" role="button" data-tid="${t.id}" aria-label="Task: ${esc(t.name)}, owner ${esc(ownerLabel(t.owner))}, ${t.comp}% complete, weeks ${esc(wlab||'')} to ${esc(wlab1||'')}. Press Enter to edit."${editMode?` draggable="true" data-drag="${t.id}"`:''}>${editMode?'<span class="drag" aria-hidden="true">⠿</span>':''}<span class="d" style="background:${ownerColor(t.owner)}" aria-hidden="true"></span><span class="nm" title="${esc(t.name)} · ${esc(ownerLabel(t.owner))}">${esc(t.name)}</span>
+      h+=`<div class="namecell" tabindex="0" role="button" data-tid="${t.id}" data-flip="n-${t.id}" aria-label="Task: ${esc(t.name)}, owner ${esc(ownerLabel(t.owner))}, ${t.comp}% complete, weeks ${esc(wlab||'')} to ${esc(wlab1||'')}. Press Enter to edit."${editMode?` draggable="true" data-drag="${t.id}"`:''}>${editMode?'<span class="drag" aria-hidden="true">⠿</span>':''}<span class="d" style="background:${ownerColor(t.owner)}" aria-hidden="true"></span><span class="nm" title="${esc(t.name)} · ${esc(ownerLabel(t.owner))}">${esc(t.name)}</span>
         <span class="acts"><button class="mini" data-edit="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">✎</button><button class="mini del" data-del="${t.id}" aria-label="Delete ${esc(t.name)}" title="Delete">×</button></span></div>`;
       if(progress){
         let cells='';
         for(let w=t.w0; w<=t.w1 && w<n; w++){
           cells+=`<div class="pcell" data-edit="${t.id}" data-tip="${t.id}" title="${esc(t.name)}" style="left:${w*COLW}px;width:${COLW-3}px;background:${weekStatus(t,w)}"></div>`;
         }
-        h+=`<div class="track ptrack">${cells}</div>`;
+        h+=`<div class="track ptrack" data-flip="t-${t.id}">${cells}</div>`;
       } else {
         const left=t.w0*COLW, width=(t.w1-t.w0+1)*COLW;
-        h+=`<div class="track"><div class="bar ${t.comp>=100?'done':''}" data-edit="${t.id}" data-tip="${t.id}"
+        h+=`<div class="track" data-flip="t-${t.id}"><div class="bar ${t.comp>=100?'done':''}" data-edit="${t.id}" data-tip="${t.id}"
           style="left:${left}px;width:${width-7}px;background-color:${ownerColor(t.owner)}">
           <span class="fill" style="width:${t.comp}%"></span><span class="stripe"></span>
           <span class="lbl">${esc(t.name)} · ${t.comp}%</span></div></div>`;
@@ -1422,6 +1436,22 @@ function bindDrag(grid){
     el.addEventListener("drop",e=>{ e.preventDefault(); el.classList.remove("dragover"); dropOn(el.dataset.drag); });
   });
 }
+// FLIP: smoothly animate rows from their old to new positions across a re-render
+function flipReorder(renderFn){
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const first=new Map();
+  if(!reduce) document.querySelectorAll('#grid [data-flip]').forEach(el=>first.set(el.dataset.flip, el.getBoundingClientRect().top));
+  renderFn();
+  if(reduce) return;
+  document.querySelectorAll('#grid [data-flip]').forEach(el=>{
+    const o=first.get(el.dataset.flip); if(o==null) return;
+    const dy=o-el.getBoundingClientRect().top;
+    if(!dy) return;
+    el.style.transform=`translateY(${dy}px)`; el.style.transition='none';
+    requestAnimationFrame(()=>{ el.style.transition='transform .34s var(--ease-out)'; el.style.transform='';
+      setTimeout(()=>{ el.style.transition=''; }, 380); });
+  });
+}
 async function dropOn(targetId){
   if(!dragId||dragId===targetId) return;
   const from=tasks.findIndex(t=>t.id===dragId); if(from<0) return;
@@ -1431,7 +1461,7 @@ async function dropOn(targetId){
   const to=tasks.findIndex(t=>t.id===targetId);
   tasks.splice(to<0?tasks.length:to,0,moved);
   tasks.forEach((t,i)=>t.sort_order=i);
-  renderGrid();
+  flipReorder(renderGrid);
   setSync("saving");
   try{ await apiSave({...moved}); await apiReorder(tasks.map(t=>t.id)); setSync("live"); }catch(e){ setSync("off"); }
 }
@@ -1455,7 +1485,7 @@ function listHtml(a){return a.length?'<ul>'+a.map(t=>`<li>${esc(t.name)} <b>${t.
 function showWeekTip(w,e){const wk=cfg.weeks[w];if(!wk)return;
   tip.innerHTML=`<h4>${esc(wk.label)} <span class="mono">${esc(wk.range)}</span></h4>`+
    ownerList().map(o=>`<div class="grp"><div class="who"><span class="d" style="background:${ownerColor(o)}"></span>${esc(o)}</div>${listHtml(tasksFor(w,o))}</div>`).join("");
-  tip.style.opacity="1";posTip(e);}
+  tip.classList.add("tipvis");posTip(e);}
 function showBarTip(id,e){const t=tasks.find(x=>x.id===id);if(!t)return;const w0=cfg.weeks[t.w0],w1=cfg.weeks[t.w1];
   tip.innerHTML=`<h4>${esc(t.name)} <span class="d" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${ownerColor(t.owner)}"></span></h4>
    <div style="color:var(--mut);font-size:11.5px">${esc(ownerLabel(t.owner))} · ${esc(t.section)}</div>
@@ -1464,8 +1494,8 @@ function showBarTip(id,e){const t=tasks.find(x=>x.id===id);if(!t)return;const w0
      <div><div style="color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Done</div><div class="mono" style="font-weight:700">${t.comp}%</div></div>
      <div><div style="color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em">Hours</div><div class="mono" style="font-weight:700">${fmtH(t.logged_hours)} / ${fmtH(t.est_hours)}</div></div>
    </div>`;
-  tip.style.opacity="1";posTip(e);}
-function hideTip(){tip.style.opacity="0";}
+  tip.classList.add("tipvis");posTip(e);}
+function hideTip(){tip.classList.remove("tipvis");}
 
 /* ====================== LEGEND + VIEW TOGGLE ====================== */
 function renderLegend(){
