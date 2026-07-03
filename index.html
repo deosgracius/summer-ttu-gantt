@@ -292,6 +292,28 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
   padding:13px 15px; box-shadow:var(--card-shadow-hover); font-size:12px; pointer-events:none; opacity:0; transform:translateY(7px) scale(.97);
   transition:opacity .16s var(--ease-out), transform .16s var(--ease-out); backdrop-filter:blur(22px) saturate(1.3)}
 #tip.tipvis{opacity:1; transform:none}
+/* ===== command palette (⌘K) ===== */
+.cmdk{position:fixed; inset:0; z-index:260; display:none; align-items:flex-start; justify-content:center; padding:13vh 16px 16px;
+  background:rgba(6,10,18,.5); backdrop-filter:blur(6px)}
+.cmdk.show{display:flex; animation:fade .18s}
+.cmdk-box{width:min(600px,96vw); background:color-mix(in srgb,var(--panel-solid) 95%,transparent); border:1px solid var(--line-strong);
+  border-radius:16px; box-shadow:0 34px 80px -22px rgba(0,0,0,.62), var(--card-shadow); overflow:hidden; animation:modalPop .3s var(--spring) both}
+.cmdk-search{display:flex; align-items:center; gap:11px; padding:15px 17px; border-bottom:1px solid var(--line); color:var(--mut)}
+.cmdk-search input{flex:1; border:0; background:transparent; outline:none; color:var(--txt); font-size:15.5px; font-family:var(--font); letter-spacing:-.01em}
+.cmdk-search input::placeholder{color:var(--faint)}
+.cmdk-esc{font-size:10px; font-weight:700; color:var(--mut); background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:3px 6px}
+.cmdk-list{max-height:min(52vh,420px); overflow-y:auto; padding:8px}
+.cmdk-item{display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; cursor:pointer}
+.cmdk-item .ci{width:27px; height:27px; flex:none; display:grid; place-items:center; font-size:15px; background:var(--panel2); border:1px solid var(--line); border-radius:8px}
+.cmdk-item .cl{flex:1; min-width:0; font-size:13.5px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.cmdk-item .ch{font-size:11px; color:var(--mut); font-weight:500}
+.cmdk-item.sel{background:color-mix(in srgb,var(--deo) 15%,transparent)}
+.cmdk-item.sel .ci{border-color:color-mix(in srgb,var(--deo) 45%,transparent); color:var(--deo)}
+.cmdk-empty{padding:28px; text-align:center; color:var(--mut); font-size:13px}
+.cmdk-foot{display:flex; gap:16px; align-items:center; padding:9px 15px; border-top:1px solid var(--line); font-size:11px; color:var(--mut)}
+.cmdk-foot kbd,.cmdk-esc{font-family:var(--mono)}
+.cmdk-foot kbd{font-size:10px; background:var(--panel2); border:1px solid var(--line); border-radius:5px; padding:1px 5px; margin-right:2px}
+.cmdk-foot .cmdk-brand{margin-left:auto; font-weight:800; color:var(--txt2); letter-spacing:.04em}
 #tip h4{margin:0 0 9px; font-size:12.5px; display:flex; justify-content:space-between; gap:10px}
 #tip h4 span{color:var(--mut); font-weight:500}
 #tip .grp{margin:8px 0 0}
@@ -734,6 +756,7 @@ input:focus-visible,select:focus-visible{outline:none}
     </div>
     <div class="spacer"></div>
     <span class="sync" id="sync"><span class="dot"></span><span id="syncTxt">Live</span></span>
+    <button class="tbtn" id="cmdkBtn" title="Command palette (Ctrl / ⌘ K)" aria-label="Open command palette"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span style="font-family:var(--mono);font-size:11px;opacity:.85">⌘K</span></button>
     <button class="tbtn" id="themeBtn" title="Toggle theme"></button>
     <button class="tbtn" id="settingsBtn" title="Settings"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.6"/></svg> Settings</button>
     <button class="tbtn" id="exportBtn" title="Export to Markdown (for Obsidian)"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
@@ -773,6 +796,19 @@ input:focus-visible,select:focus-visible{outline:none}
 
 <div id="tip"></div>
 <div class="toast" id="toast"></div>
+
+<!-- ============ COMMAND PALETTE (⌘K) ============ -->
+<div class="cmdk" id="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="cmdk-box">
+    <div class="cmdk-search">
+      <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="cmdkInput" placeholder="Type a command or search tasks…" autocomplete="off" spellcheck="false">
+      <kbd class="cmdk-esc">ESC</kbd>
+    </div>
+    <div class="cmdk-list" id="cmdkList"></div>
+    <div class="cmdk-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> select</span><span class="cmdk-brand">⌘K</span></div>
+  </div>
+</div>
 
 <!-- ============ HELP ASSISTANT (free, offline) ============ -->
 <button id="helpFab" title="Help" aria-label="Help assistant">
@@ -2420,6 +2456,49 @@ $("#helpFab").onclick=()=>{ const p=$("#helpPanel"); if(p.classList.contains("sh
 $("#hpClose").onclick=()=>$("#helpPanel").classList.remove("show");
 $("#hpSend").onclick=()=>hpAsk($("#hpInput").value);
 $("#hpInput").addEventListener("keydown",e=>{ if(e.key==="Enter") hpAsk($("#hpInput").value); });
+
+/* ====================== COMMAND PALETTE (⌘K) ====================== */
+const CMDK_CMDS=[
+  {icon:"📅",label:"Go to Timeline",hint:"View",kw:"timeline gantt tasks",run:()=>setView("timeline")},
+  {icon:"💰",label:"Go to Budget",hint:"View",kw:"budget cost money labor",run:()=>setView("budget")},
+  {icon:"➕",label:"Add task",hint:"Create",kw:"new task create add",run:()=>openTask(null)},
+  {icon:"📊",label:"Detailed timeline",hint:"View",kw:"detailed bars",run:()=>{setView("timeline");setTimelineView("detailed");}},
+  {icon:"🟩",label:"Progress view",hint:"View",kw:"progress status colors",run:()=>{setView("timeline");setTimelineView("progress");}},
+  {icon:"⬇️",label:"Export report",hint:"Export",kw:"export pdf markdown download report",run:()=>{const b=$("#exportBtn"); if(b) b.click();}},
+  {icon:"⚙️",label:"Settings",hint:"Manage",kw:"settings members colors passcode",run:()=>{const b=$("#settingsBtn"); if(b) b.click();}},
+  {icon:"🌗",label:"Toggle theme",hint:"Appearance",kw:"dark light theme mode",run:()=>setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark")},
+  {icon:"❓",label:"Help assistant",hint:"Help",kw:"help how support",run:()=>openHelp()},
+  {icon:"🚪",label:"Sign out",hint:"Session",kw:"logout signout leave",run:()=>doLogout()}
+];
+let cmdkItems=[], cmdkSel=0;
+function cmdkFuzzy(hay,q){ hay=hay.toLowerCase(); if(!q) return 1;
+  if(hay.includes(q)) return 100-hay.indexOf(q);
+  let i=-1; for(const c of q){ i=hay.indexOf(c,i+1); if(i<0) return -1; } return 20; }
+function cmdkFilter(q){ q=(q||"").trim().toLowerCase();
+  const cmds=CMDK_CMDS.map(c=>({c,s:cmdkFuzzy(c.label+" "+(c.kw||""),q)+60}));
+  const tsk=(tasks||[]).map(t=>({c:{icon:"○",label:t.name,hint:t.section,run:()=>openTask(t.id)},s:cmdkFuzzy(t.name+" "+t.section,q)}));
+  cmdkItems=[...cmds,...tsk].filter(x=>x.s>=0).sort((a,b)=>b.s-a.s).slice(0,9).map(x=>x.c);
+  cmdkSel=0; cmdkRender(); }
+function cmdkRender(){ const list=$("#cmdkList");
+  if(!cmdkItems.length){ list.innerHTML=`<div class="cmdk-empty">No matches</div>`; return; }
+  list.innerHTML=cmdkItems.map((c,i)=>`<div class="cmdk-item${i===cmdkSel?' sel':''}" data-i="${i}"><span class="ci">${c.icon}</span><span class="cl">${esc(c.label)}</span><span class="ch">${esc(c.hint||"")}</span></div>`).join("");
+  list.querySelectorAll(".cmdk-item").forEach(el=>{ el.onmousemove=()=>{ cmdkSel=+el.dataset.i; cmdkHi(); }; el.onclick=()=>cmdkRun(+el.dataset.i); }); }
+function cmdkHi(){ $("#cmdkList").querySelectorAll(".cmdk-item").forEach((el,i)=>el.classList.toggle("sel",i===cmdkSel)); }
+function cmdkRun(i){ const c=cmdkItems[i]; cmdkClose(); if(c&&c.run) setTimeout(c.run,50); }
+function cmdkOpen(){ if(!$("#app")||getComputedStyle($("#app")).display==="none") return;
+  $("#cmdkInput").value=""; $("#cmdk").classList.add("show"); cmdkFilter(""); setTimeout(()=>$("#cmdkInput").focus(),30); }
+function cmdkClose(){ $("#cmdk").classList.remove("show"); }
+$("#cmdkInput").addEventListener("input",e=>cmdkFilter(e.target.value));
+$("#cmdk").addEventListener("click",e=>{ if(e.target.id==="cmdk") cmdkClose(); });
+$("#cmdkInput").addEventListener("keydown",e=>{
+  if(e.key==="ArrowDown"){ e.preventDefault(); cmdkSel=Math.min(cmdkItems.length-1,cmdkSel+1); cmdkHi(); cmdkScroll(); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); cmdkSel=Math.max(0,cmdkSel-1); cmdkHi(); cmdkScroll(); }
+  else if(e.key==="Enter"){ e.preventDefault(); cmdkRun(cmdkSel); }
+  else if(e.key==="Escape"){ cmdkClose(); } });
+function cmdkScroll(){ const el=$("#cmdkList").querySelector(".cmdk-item.sel"); if(el) el.scrollIntoView({block:"nearest"}); }
+document.addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&(e.key==="k"||e.key==="K")){ e.preventDefault();
+  $("#cmdk").classList.contains("show")?cmdkClose():cmdkOpen(); } });
+{ const cb=$("#cmdkBtn"); if(cb) cb.onclick=cmdkOpen; }
 
 /* ====================== BOOT ====================== */
 if(PASS){ tryUnlock(PASS); } else { $("#gatepass").focus(); }
