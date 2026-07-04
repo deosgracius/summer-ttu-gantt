@@ -98,11 +98,11 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 @keyframes shimmer{0%{background-position:-160% 0}100%{background-position:160% 0}}
 @keyframes floatUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .view-in{animation:reveal .44s var(--ease-out) both}
-.view-in .dash>.card,.view-in .bdash>.card,.view-in .btable{animation:revealPop .52s var(--ease-out) both}
-.view-in .dash>.card:nth-child(2),.view-in .bdash>.card:nth-child(2){animation-delay:.05s}
-.view-in .dash>.card:nth-child(3),.view-in .bdash>.card:nth-child(3){animation-delay:.1s}
-.view-in .dash>.card:nth-child(4){animation-delay:.15s}
-.view-in .dash>.card:nth-child(5){animation-delay:.2s}
+.view-in .dash>.statcard,.view-in .bdash>.card,.view-in .btable{animation:revealPop .52s var(--ease-out) both}
+.view-in .dash>.statcard:nth-child(2),.view-in .bdash>.card:nth-child(2){animation-delay:.05s}
+.view-in .dash>.statcard:nth-child(3),.view-in .bdash>.card:nth-child(3){animation-delay:.1s}
+.view-in .dash>.statcard:nth-child(4){animation-delay:.15s}
+.view-in .dash>.statcard:nth-child(5){animation-delay:.2s}
 .view-in .btable:nth-of-type(2){animation-delay:.06s}
 .view-in .btable:nth-of-type(3){animation-delay:.12s}
 .view-in .btable:nth-of-type(4){animation-delay:.18s}
@@ -196,7 +196,52 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 @keyframes pulse{50%{opacity:.35}}
 
 /* ============ DASHBOARD ============ */
-.dash{display:grid; grid-template-columns:repeat(auto-fit,minmax(184px,1fr)); gap:14px; margin-bottom:18px}
+.dash{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:20px}
+/* tab row with Add task pinned right */
+.tabrow{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; flex-wrap:wrap}
+.tabrow .tabs{margin-bottom:0}
+/* shadcn-style clickable stat cards */
+.statcard{text-align:left; width:100%; background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
+  padding:15px 16px 14px; box-shadow:var(--card-shadow); cursor:pointer; display:flex; flex-direction:column; gap:9px;
+  transition:transform var(--t),box-shadow var(--t),border-color var(--t); position:relative; overflow:hidden; will-change:transform}
+.statcard:hover{transform:translateY(-3px); box-shadow:var(--card-shadow-hover), 0 0 0 1px color-mix(in srgb,var(--deo) 24%,transparent);
+  border-color:color-mix(in srgb,var(--deo) 24%,var(--line))}
+.statcard:active{transform:translateY(-1px) scale(.995)}
+.sc-head{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.sc-k{font-size:12px; font-weight:600; color:var(--mut); letter-spacing:.01em}
+.sc-more{font-size:11px; font-weight:700; color:var(--deo); opacity:0; transform:translateX(-4px); transition:.18s var(--ease-out); white-space:nowrap}
+.sc-more::after{content:" →"}
+.statcard:hover .sc-more{opacity:1; transform:none}
+.sc-v{font-size:29px; font-weight:700; letter-spacing:-.03em; line-height:1; color:var(--txt); font-variant-numeric:tabular-nums; margin-top:1px}
+.sc-u{font-size:13.5px; font-weight:600; color:var(--mut); margin-left:4px; letter-spacing:-.01em}
+.sc-bar{height:6px; border-radius:99px; background:var(--panel2); overflow:hidden; border:1px solid var(--line)}
+.sc-bar i{display:block; height:100%; border-radius:99px; background:var(--deo); transition:width .7s var(--ease-out)}
+.sc-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:1px}
+.sc-sub{font-size:11.5px; color:var(--mut)}
+.badge{display:inline-flex; align-items:center; font-size:11px; font-weight:600; padding:2px 9px; border-radius:999px;
+  background:var(--panel2); border:1px solid var(--line); color:var(--txt2)}
+.badge.ok{color:var(--ok); background:color-mix(in srgb,var(--ok) 13%,transparent); border-color:color-mix(in srgb,var(--ok) 32%,transparent)}
+.badge.bad{color:var(--bad); background:color-mix(in srgb,var(--bad) 13%,transparent); border-color:color-mix(in srgb,var(--bad) 32%,transparent)}
+/* metric summary modal */
+.mm-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:4px}
+.mm-head .x{width:30px;height:30px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:var(--mut);font-size:13px}
+.mm-head .x:hover{color:var(--txt); border-color:var(--line-strong)}
+.mm-lead{font-size:13.5px; color:var(--txt2); margin:8px 0 14px; line-height:1.55}
+.mm-lead b{color:var(--txt)}
+.mm-row{display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--line); font-size:13px; color:var(--mut)}
+.mm-row b{color:var(--txt); font-weight:600}
+.mm-sec{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); margin:16px 0 6px}
+.mm-task{display:flex; align-items:center; gap:9px; padding:6px 0; font-size:12.5px; color:var(--txt2)}
+.mm-task .d{width:9px;height:9px;border-radius:3px;flex:none}
+.mm-task .mm-x{margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--mut)}
+.mm-ok{color:var(--ok); font-size:12.5px; padding:10px 0; font-weight:600}
+.mm-owner{margin:13px 0}
+.mm-orow{display:flex; justify-content:space-between; font-size:13px; font-weight:600; color:var(--txt)}
+.mm-orow .nm{display:flex; align-items:center; gap:8px}
+.mm-orow .d{width:10px;height:10px;border-radius:3px}
+.mm-owner .ob{height:7px; border-radius:99px; background:var(--panel2); overflow:hidden; margin:6px 0 3px; border:1px solid var(--line)}
+.mm-owner .ob i{display:block; height:100%; border-radius:99px; transition:width .6s var(--ease-out)}
+.mm-sub2{font-size:11px; color:var(--mut)}
 .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
   padding:18px 19px; box-shadow:var(--card-shadow); position:relative; overflow:hidden; transition:box-shadow .25s, border-color .25s, transform .25s}
 .card::before{content:""; position:absolute; left:0; right:0; top:0; height:2px; background:var(--accent-grad); opacity:0; transition:opacity .25s}
@@ -762,12 +807,14 @@ input:focus-visible,select:focus-visible{outline:none}
     <button class="tbtn" id="exportBtn" title="Export to Markdown (for Obsidian)"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
     <button class="tbtn" id="editBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit</button>
     <button class="tbtn" id="logoutBtn" title="Sign out"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign out</button>
-    <button class="tbtn primary" id="addBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Add task</button>
   </div>
 
-  <div class="tabs" id="maincontent" tabindex="-1" role="tablist" aria-label="Views">
-    <button class="tab active" role="tab" aria-selected="true" data-view="timeline"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Timeline</button>
-    <button class="tab" role="tab" aria-selected="false" data-view="budget"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Budget</button>
+  <div class="tabrow">
+    <div class="tabs" id="maincontent" tabindex="-1" role="tablist" aria-label="Views">
+      <button class="tab active" role="tab" aria-selected="true" data-view="timeline"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Timeline</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="budget"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Budget</button>
+    </div>
+    <button class="tbtn primary" id="addBtn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Add task</button>
   </div>
 
   <div id="viewTimeline">
@@ -796,6 +843,12 @@ input:focus-visible,select:focus-visible{outline:none}
 
 <div id="tip"></div>
 <div class="toast" id="toast"></div>
+
+<!-- ============ METRIC SUMMARY ============ -->
+<div class="modal" id="metricModal"><div class="sheet" role="dialog" aria-modal="true" aria-label="Summary">
+  <div class="mm-head"><h3 id="mmTitle">Summary</h3><button class="x" id="mmClose" type="button" aria-label="Close">✕</button></div>
+  <div id="mmBody"></div>
+</div></div>
 
 <!-- ============ COMMAND PALETTE (⌘K) ============ -->
 <div class="cmdk" id="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
@@ -1319,23 +1372,29 @@ function renderDash(){
   const ownerStats=o=>{const a=tasks.filter(t=>ownerCanon(t.owner)===o); const p=a.length?Math.round(a.reduce((s,t)=>s+t.comp,0)/a.length):0; return {n:a.length,p};};
   const dStats=ownerList().map(o=>({o,...ownerStats(o)}));
 
+  const schedPct=Math.min(100,Math.round((nw+1)/tw*100));
   $("#dash").innerHTML = `
-   <div class="card">${ringSvg(avg)}<div class="k">Overall progress</div>
-     <div class="v"><span data-count="${avg}" data-key="overall">${avg}</span><small>%</small></div>
-     <div class="meta">${done} of ${total} tasks complete</div></div>
-   <div class="card"><div class="k">Schedule</div>
-     <div class="v" style="font-size:22px">Week ${nw+1}<small> / ${tw}</small></div>
-     <div class="meta"><span class="pill ${onTrack?'ok':'bad'}">${onTrack?'On track':'Behind'}</span> &nbsp;target ~${expected}%</div>
-     <div class="pbar"><i style="width:${avg}%"></i></div></div>
-   <div class="card"><div class="k">Hours logged</div>
-     <div class="v"><span data-count="${log}" data-key="hours" data-dec="1">${fmtH(log)}</span><small> / ${fmtH(est)}h</small></div>
-     <div class="meta">${hPct}% of expected · ${NW()}wk × 12h × ${nMembers}</div>
-     <div class="pbar"><i style="width:${hPct}%"></i></div></div>
-   <div class="card"><div class="k">By owner</div>
-     <div class="owners" style="margin-top:8px">
+   <button type="button" class="statcard" data-metric="overall">
+     <div class="sc-head"><span class="sc-k">Overall progress</span><span class="sc-more">Details</span></div>
+     <div class="sc-v"><span data-count="${avg}" data-key="overall">${avg}</span><span class="sc-u">%</span></div>
+     <div class="sc-bar"><i style="width:${avg}%"></i></div>
+     <div class="sc-foot"><span class="badge ${avg>=100?'ok':''}">${done}/${total} tasks done</span></div></button>
+   <button type="button" class="statcard" data-metric="schedule">
+     <div class="sc-head"><span class="sc-k">Schedule</span><span class="sc-more">Details</span></div>
+     <div class="sc-v">Week ${nw+1}<span class="sc-u">/ ${tw}</span></div>
+     <div class="sc-bar"><i style="width:${schedPct}%"></i></div>
+     <div class="sc-foot"><span class="badge ${onTrack?'ok':'bad'}">${onTrack?'On track':'Behind'}</span><span class="sc-sub">target ~${expected}%</span></div></button>
+   <button type="button" class="statcard" data-metric="hours">
+     <div class="sc-head"><span class="sc-k">Hours logged</span><span class="sc-more">Details</span></div>
+     <div class="sc-v"><span data-count="${log}" data-key="hours" data-dec="1">${fmtH(log)}</span><span class="sc-u">/ ${fmtH(est)}h</span></div>
+     <div class="sc-bar"><i style="width:${hPct}%"></i></div>
+     <div class="sc-foot"><span class="badge">${hPct}% of expected</span></div></button>
+   <button type="button" class="statcard" data-metric="owner">
+     <div class="sc-head"><span class="sc-k">By owner</span><span class="sc-more">Details</span></div>
+     <div class="owners" style="margin-top:6px">
        ${dStats.map(s=>`<div class="orow"><div class="nm" title="${esc(s.o)}"><span class="d" style="background:${ownerColor(s.o)}"></span>${esc(s.o)}</div>
          <div class="ob"><i style="width:${s.p}%;background:${ownerColor(s.o)}"></i></div><div class="pc">${s.p}%</div></div>`).join("")}
-     </div></div>`;
+     </div></button>`;
   animateCounts();
 }
 const _counts={};
@@ -1376,6 +1435,52 @@ function confettiBurst(x, y, big){
 }
 function celebrate(big){ confettiBurst(innerWidth/2, innerHeight*0.34, big);
   toast(big?"🏆 Project complete — every task done!":"🎉 Task complete!"); }
+
+/* ---- click a dashboard card → summary of what's going on ---- */
+const METRIC_TITLES={overall:"Overall progress",schedule:"Schedule",hours:"Hours logged",owner:"By owner"};
+function metricSummary(type){
+  const total=tasks.length, done=tasks.filter(t=>t.comp>=100).length;
+  const avg=total?Math.round(tasks.reduce((s,t)=>s+t.comp,0)/total):0;
+  const inprog=tasks.filter(t=>t.comp>0&&t.comp<100).length;
+  const nMembers=Math.max(1,memberList().length);
+  const est=NW()*12*nMembers, log=memberList().reduce((s,m)=>s+memberActualHours(m),0);
+  const hPct=est?Math.round(log/est*100):0, nw=cfg.now_week, tw=NW()||1;
+  const expected=Math.round(Math.min(1,(nw+1)/tw)*100), onTrack=avg>=expected-8;
+  const row=(l,v)=>`<div class="mm-row"><span>${l}</span><b>${v}</b></div>`;
+  const tlist=arr=>arr.length?arr.map(t=>`<div class="mm-task"><span class="d" style="background:${ownerColor(t.owner)}"></span>${esc(t.name)}<span class="mm-x">${t.comp}% · ${esc(ownerLabel(t.owner))}</span></div>`).join(""):`<div class="mm-ok">Nothing here — all good.</div>`;
+  if(type==="overall"){
+    const behind=tasks.filter(t=>t.comp<100 && t.w1<nw).slice(0,10);
+    return `<p class="mm-lead">You're <b>${avg}%</b> through the project — <b>${done}</b> of <b>${total}</b> tasks complete, <b>${inprog}</b> in progress.</p>`
+      +row("Completed",done)+row("In progress",inprog)+row("Not started",Math.max(0,total-done-inprog))
+      +`<div class="mm-sec">Overdue / behind (${behind.length})</div>`+tlist(behind);
+  }
+  if(type==="schedule"){
+    const remaining=Math.max(0,tw-(nw+1));
+    const due=tasks.filter(t=>t.comp<100 && t.w1>=nw && t.w1<=nw+1).slice(0,10);
+    return `<p class="mm-lead">It's <b>week ${nw+1}</b> of ${tw}. By now you'd expect about <b>${expected}%</b>; you're at <b>${avg}%</b> — <span class="badge ${onTrack?'ok':'bad'}">${onTrack?'on track':'behind'}</span>.</p>`
+      +row("Weeks elapsed",`${nw+1} / ${tw}`)+row("Weeks remaining",remaining)+row("Target vs actual",`${expected}% vs ${avg}%`)
+      +`<div class="mm-sec">Due this / next week (${due.length})</div>`+tlist(due);
+  }
+  if(type==="hours"){
+    return `<p class="mm-lead"><b>${fmtH(log)}</b> of <b>${fmtH(est)}</b> expected hours logged (<b>${hPct}%</b>). Expected = ${NW()} weeks × 12h × ${nMembers} member${nMembers>1?'s':''}.</p>`
+      +`<div class="mm-sec">Per member</div>`
+      +memberList().map(m=>row(esc(m),`${fmtH(memberActualHours(m))}h`)).join("")
+      +row("Shared work (split evenly)",`${fmtH(sharedLoggedHours())}h`)
+      +row("Remaining vs expected",`${fmtH(Math.max(0,est-log))}h`);
+  }
+  if(type==="owner"){
+    const stats=ownerList().map(o=>{const a=tasks.filter(t=>ownerCanon(t.owner)===o); return {o,n:a.length,p:a.length?Math.round(a.reduce((s,t)=>s+t.comp,0)/a.length):0,h:o==="Shared"?0:memberActualHours(o)};});
+    return `<p class="mm-lead">How the work is split across <b>${stats.length}</b> owner${stats.length===1?'':'s'}.</p>`
+      +stats.map(s=>`<div class="mm-owner"><div class="mm-orow"><span class="nm"><span class="d" style="background:${ownerColor(s.o)}"></span>${esc(s.o)}</span><b>${s.p}%</b></div><div class="ob"><i style="width:${s.p}%;background:${ownerColor(s.o)}"></i></div><div class="mm-sub2">${s.n} task${s.n===1?'':'s'}${s.o!=="Shared"?` · ${fmtH(s.h)}h logged`:""}</div></div>`).join("");
+  }
+  return "";
+}
+function openMetric(type){ if(!METRIC_TITLES[type]) return; modalOpen=true;
+  $("#mmTitle").textContent=METRIC_TITLES[type]; $("#mmBody").innerHTML=metricSummary(type); $("#metricModal").classList.add("show"); }
+function closeMetric(){ modalOpen=false; $("#metricModal").classList.remove("show"); }
+$("#dash").addEventListener("click",e=>{ const c=e.target.closest(".statcard"); if(c) openMetric(c.dataset.metric); });
+$("#mmClose").onclick=closeMetric;
+$("#metricModal").addEventListener("click",e=>{ if(e.target.id==="metricModal") closeMetric(); });
 
 /* ====================== RENDER: CHIPS ====================== */
 function renderChips(){
@@ -1776,7 +1881,7 @@ let _rsT; window.addEventListener("resize",()=>{ clearTimeout(_rsT); _rsT=setTim
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){
   if($("#taskModal").classList.contains("show"))closeTask();
   if($("#setModal").classList.contains("show"))closeSet();
-  ["adminModal","auditModal"].forEach(id=>{const m=$("#"+id); if(m&&m.classList.contains("show")){m.classList.remove("show");modalOpen=false;}});
+  ["adminModal","auditModal","metricModal"].forEach(id=>{const m=$("#"+id); if(m&&m.classList.contains("show")){m.classList.remove("show");modalOpen=false;}});
   if($("#helpPanel").classList.contains("show"))$("#helpPanel").classList.remove("show");
   const em=$("#exportMenu"); if(em)em.remove();
 }});
