@@ -107,6 +107,31 @@ export function hpCorrect(tok, vocab, df) {
   return best || tok;
 }
 
+/** Dashboard metrics — the numbers behind the four summary cards. */
+export function dashStats(tasks, cfg, members) {
+  tasks = tasks || []; members = members || [];
+  const total = tasks.length;
+  const done = tasks.filter(t => (+t.comp || 0) >= 100).length;
+  const avg = total ? Math.round(tasks.reduce((s, t) => s + (+t.comp || 0), 0) / total) : 0;
+  const nMembers = Math.max(1, members.length);
+  const weeks = (cfg.weeks || []).length;
+  const est = weeks * 12 * nMembers;
+  const log = members.reduce((s, m) => s + memberLogged(m, tasks, members), 0);
+  const hPct = est ? Math.min(100, Math.round(log / est * 100)) : 0;
+  const nw = cfg.now_week || 0, tw = weeks || 1;
+  const expected = Math.round(Math.min(1, (nw + 1) / tw) * 100);
+  const onTrack = avg >= expected - 8;
+  const schedPct = Math.min(100, Math.round((nw + 1) / tw * 100));
+  return { total, done, avg, nMembers, weeks, est, log, hPct, nw, tw, expected, onTrack, schedPct };
+}
+
+/** Incomplete tasks whose end week is already in the past (overdue). */
+export function overdueTasks(tasks, nowWeek) { return (tasks || []).filter(t => (+t.comp || 0) < 100 && t.w1 < nowWeek); }
+/** Incomplete tasks due this week or next. */
+export function dueSoonTasks(tasks, nowWeek) { return (tasks || []).filter(t => (+t.comp || 0) < 100 && t.w1 >= nowWeek && t.w1 <= nowWeek + 1); }
+/** Count of started-but-unfinished tasks. */
+export function inProgressCount(tasks) { return (tasks || []).filter(t => { const c = +t.comp || 0; return c > 0 && c < 100; }).length; }
+
 /** Command-palette fuzzy score: substring > subsequence > no match. */
 export function cmdkFuzzy(hay, q) {
   hay = hay.toLowerCase(); if (!q) return 1;

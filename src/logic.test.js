@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   ownerCanon, sharedLoggedHours, memberLogged, syncLaborHours, rentalExempt,
-  pDate, projectDays, calcBudget, sigOf, hpLev, hpCorrect, cmdkFuzzy
+  pDate, projectDays, calcBudget, sigOf, hpLev, hpCorrect, cmdkFuzzy,
+  dashStats, overdueTasks, dueSoonTasks, inProgressCount
 } from "./logic.js";
 
 describe("ownerCanon", () => {
@@ -128,6 +129,42 @@ describe("sigOf (order-independent change detection)", () => {
     const a = { config: { x: 1 }, tasks: [{ id: "a" }, { id: "b" }] };
     const b = { config: { x: 2 }, tasks: [{ id: "a" }, { id: "b" }] };
     expect(sigOf(a)).not.toBe(sigOf(b));
+  });
+});
+
+describe("dashboard metrics", () => {
+  const cfg = { weeks: new Array(10).fill(0).map((_, i) => ({ label: "W" + (i + 1) })), now_week: 4 };
+  const members = ["Deo", "Cannon"];
+  const tasks = [
+    { owner: "Deo", comp: 100, w0: 0, w1: 1, logged_hours: 40 },
+    { owner: "Deo", comp: 50, w0: 2, w1: 3, logged_hours: 10 },   // overdue (w1=3 < now 4), in progress
+    { owner: "Cannon", comp: 0, w0: 4, w1: 5, logged_hours: 0 },  // due now/next
+    { owner: "Cannon", comp: 100, w0: 1, w1: 2, logged_hours: 20 },
+    { owner: "Shared", comp: 0, w0: 8, w1: 9, logged_hours: 10 },
+  ];
+
+  it("computes progress, schedule target, and hours %", () => {
+    const s = dashStats(tasks, cfg, members);
+    expect(s.total).toBe(5);
+    expect(s.done).toBe(2);
+    expect(s.avg).toBe(50);            // (100+50+0+100+0)/5
+    expect(s.est).toBe(10 * 12 * 2);   // 240 expected hours
+    expect(s.log).toBeCloseTo(80, 6);  // 40+10+0+20+10 all attributed
+    expect(s.hPct).toBe(33);           // 80/240
+    expect(s.expected).toBe(50);       // week 5 of 10 → 50%
+    expect(s.onTrack).toBe(true);      // avg 50 >= 50-8
+    expect(s.schedPct).toBe(50);
+  });
+
+  it("flags overdue, due-soon, and in-progress correctly", () => {
+    expect(overdueTasks(tasks, 4).length).toBe(1);   // the 50% task with w1=3
+    expect(dueSoonTasks(tasks, 4).map(t => t.owner)).toEqual(["Cannon"]); // w1 in [4,5]
+    expect(inProgressCount(tasks)).toBe(1);          // the 50% one
+  });
+
+  it("handles an empty project without dividing by zero", () => {
+    const s = dashStats([], { weeks: [], now_week: 0 }, []);
+    expect(s.avg).toBe(0); expect(s.hPct).toBe(0); expect(s.tw).toBe(1);
   });
 });
 
