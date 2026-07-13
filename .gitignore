@@ -9,3 +9,10 @@ node_modules/
 PROJECT-OVERVIEW.md
 *-PRIVATE.md
 *.pdf
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
