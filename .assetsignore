@@ -5,3 +5,8 @@
 .gitignore
 .assetsignore
 .github/
+package.json
+package-lock.json
+node_modules/
+*.test.js
+vitest.config.*

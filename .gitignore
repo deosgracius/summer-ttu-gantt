@@ -3,6 +3,7 @@ _deploy/
 EventHub_Gantt.html
 *.bak
 .DS_Store
+node_modules/
 
 # Private docs — contain credentials; never commit/serve publicly
 PROJECT-OVERVIEW.md
