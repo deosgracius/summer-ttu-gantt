@@ -119,6 +119,43 @@ describe("calcBudget", () => {
   });
 });
 
+describe("calcBudget — contract, materials, full scenario & robustness", () => {
+  const cfgNon = { class_name: "Robotic Project Lab" };
+  it("includes contract labor (rate × hours) in both columns", () => {
+    const b = { start: "2026-06-01", end: "2026-06-08", laborOhRate: 0, bizOhRate: 0,
+      labor: [], contract: [{ rate: 40, hrsA: 3, hrsE: 10 }], material: [], rental: [] };
+    const c = calcBudget(b, [], cfgNon, []);
+    expect(c.TCLa).toBe(120);   // 40 × 3
+    expect(c.TCLe).toBe(400);   // 40 × 10
+    expect(c.totalA).toBe(120);
+  });
+  it("sums direct materials (actual & estimate)", () => {
+    const b = { start: "2026-06-01", end: "2026-06-08", laborOhRate: 0, bizOhRate: 0,
+      labor: [], contract: [], material: [{ a: 30, e: 50 }, { a: 20, e: 25 }], rental: [] };
+    const c = calcBudget(b, [], cfgNon, []);
+    expect(c.TDMa).toBe(50); expect(c.TDMe).toBe(75);
+  });
+  it("computes a full mixed budget correctly", () => {
+    const members = ["A"];
+    const b = { start: "2026-06-01", end: "2026-07-01", laborOhRate: 1, bizOhRate: 0.5,
+      labor: [{ name: "A", rate: 20, hrsE: 100, hrsA: 0 }],
+      contract: [{ rate: 50, hrsA: 2, hrsE: 4 }],
+      material: [{ a: 100, e: 100 }],
+      rental: [{ value: 1000, rate: 0.2 }] };
+    const tasks = [{ owner: "A", logged_hours: 10 }];
+    const c = calcBudget(b, tasks, cfgNon, members);
+    const days = 30; const etrm = 1000 * 0.002 * days; // 60
+    const subE = (20 * 100) * 2 /*TDLe*/ + (50 * 4) /*TCLe*/ + 100 /*TDMe*/ + etrm;
+    expect(c.subE).toBeCloseTo(subE, 6);
+    expect(c.totalE).toBeCloseTo(subE * 1.5, 6);
+    expect(c.TDLa).toBe(20 * 10 * 2); // hrsA synced to 10 logged, ×(1+loh)
+  });
+  it("survives an empty/default budget with no lines", () => {
+    const c = calcBudget({ start: "2026-06-01", end: "2026-08-01", labor: [], contract: [], material: [], rental: [] }, [], cfgNon, []);
+    expect(c.totalA).toBe(0); expect(c.totalE).toBe(0); expect(c.ETRMe).toBe(0);
+  });
+});
+
 describe("sigOf (order-independent change detection)", () => {
   it("is identical when tasks are reordered", () => {
     const a = { config: { x: 1 }, tasks: [{ id: "b" }, { id: "a" }, { id: "c" }] };
