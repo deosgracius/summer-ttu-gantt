@@ -2107,6 +2107,7 @@ function renderModel(){
   wrap.innerHTML = bar + (cards? `<div class="rmboard">${cards}</div>` : `<div class="rmempty">No tasks match the current filter.</div>`);
   wrap.querySelectorAll(".rmphase button").forEach(b=> b.onclick=()=>{ modelPhase=+b.dataset.ph; renderModel(); });
   wrap.querySelectorAll(".rmtask[data-oid]").forEach(el=> el.onclick=()=>openTaskDrawer(el.dataset.oid));
+  wrap.querySelectorAll(".rmleads .avatar").forEach(el=>{ el.style.cursor="pointer"; el.onclick=()=>openMemberProfile(el.title); });
 }
 
 /* ====================== RENDER ALL ====================== */
@@ -2197,7 +2198,7 @@ function openTaskDrawer(id){ const t=(tasks||[]).find(x=>x.id===id); if(!t) retu
   const depRow=x=>`<div class="dw-dep" data-go="${x.id}"><span class="rmdot" style="background:${taskStatusColor(x)}"></span><span class="rmtn">${esc(x.name)}</span>${avatarHTML(x.owner,18)}</div>`;
   dr.innerHTML =
     `<div class="dw-head"><div class="dw-eyebrow">${esc(t.section)}</div><h3 class="dw-title">${esc(t.name)}</h3>
-       <div class="dw-sub">${avatarHTML(t.owner,24)}<span style="font-size:13px;color:var(--txt2)">${esc(ownerCanon(t.owner))}</span>
+       <div class="dw-sub"><span class="dw-owner" data-mem="${esc(ownerCanon(t.owner))}" title="View ${esc(ownerCanon(t.owner))}'s profile" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">${avatarHTML(t.owner,24)}<span style="font-size:13px;color:var(--txt2)">${esc(ownerCanon(t.owner))}</span></span>
        <span class="dw-badge" style="background:color-mix(in srgb,${stColor} 16%,transparent);color:${stColor};border:1px solid color-mix(in srgb,${stColor} 45%,transparent)">${badge} · ${c}%</span></div></div>
      <div class="dw-body">
        <div><div class="dw-sec-label">Lifecycle</div><div class="stepper">${stepper}</div></div>
@@ -2213,6 +2214,38 @@ function openTaskDrawer(id){ const t=(tasks||[]).find(x=>x.id===id); if(!t) retu
      <div class="dw-acts"><button class="btn-save" id="dwEdit">Edit task</button><button class="btn-ghost" id="dwClose">Close</button></div>`;
   dr.classList.add("show"); if(sc) sc.classList.add("show"); dr.setAttribute("aria-hidden","false"); modalOpen=true;
   $("#dwEdit").onclick=()=>{ closeTaskDrawer(); openTask(id); };
+  $("#dwClose").onclick=closeTaskDrawer;
+  dr.querySelectorAll(".dw-dep[data-go]").forEach(el=> el.onclick=()=>openTaskDrawer(el.dataset.go));
+  const ow=dr.querySelector(".dw-owner"); if(ow) ow.onclick=()=>openMemberProfile(ow.dataset.mem);
+}
+function openMemberProfile(name){ name=ownerCanon(name);
+  const dr=$("#taskDrawer"), sc=$("#drawerScrim"); if(!dr) return;
+  const own=(tasks||[]).filter(t=>ownerCanon(t.owner)===name);
+  const done=own.filter(t=>(+t.comp||0)>=100).length;
+  const avg=own.length?Math.round(own.reduce((s,t)=>s+(+t.comp||0),0)/own.length):0;
+  const hours=own.reduce((s,t)=>s+(+t.logged_hours||0),0);
+  const secs=[...new Set(own.map(t=>t.section))];
+  const openT=own.filter(t=>(+t.comp||0)<100).slice().sort((a,b)=>(a.w1-b.w1)||(a.w0-b.w0));
+  const secRow=s=>{ const list=own.filter(t=>t.section===s); const a=list.length?Math.round(list.reduce((x,t)=>x+(+t.comp||0),0)/list.length):0;
+    return `<div class="dw-dep" style="cursor:default"><span class="rmtn">${esc(s)}</span><span class="rmtsub">${list.length} · ${a}%</span></div>`; };
+  const taskRow=t=>`<div class="dw-dep" data-go="${t.id}"><span class="rmdot" style="background:${taskStatusColor(t)}"></span><span class="rmtn">${esc(t.name)}</span><span class="rmtsub">${esc(t.section)} · ${+t.comp||0}%</span></div>`;
+  dr.innerHTML =
+    `<div class="dw-head"><div class="dw-eyebrow">Member profile</div>
+       <div style="display:flex;align-items:center;gap:12px;margin-top:7px">${avatarHTML(name,44)}
+         <div><h3 class="dw-title" style="margin:0">${esc(name)}</h3>
+           <div style="font-size:12.5px;color:var(--txt2);margin-top:2px">${own.length} task${own.length===1?'':'s'} · ${avg}% complete</div></div></div></div>
+     <div class="dw-body">
+       <div class="dw-grid">
+         <div class="dw-field"><div class="k">Tasks</div><div class="v">${own.length}</div></div>
+         <div class="dw-field"><div class="k">Done</div><div class="v">${done}</div></div>
+         <div class="dw-field"><div class="k">Hours logged</div><div class="v">${(+hours.toFixed(1))}</div></div>
+         <div class="dw-field"><div class="k">Avg completion</div><div class="v">${avg}%</div></div>
+       </div>
+       ${secs.length?`<div><div class="dw-sec-label">Sections (${secs.length})</div><div class="dw-deps">${secs.map(secRow).join("")}</div></div>`:""}
+       ${openT.length?`<div><div class="dw-sec-label">Open tasks (${openT.length})</div><div class="dw-deps">${openT.map(taskRow).join("")}</div></div>`:`<div><div class="dw-sec-label">Open tasks</div><div class="rmtsub" style="padding:4px 2px">All done 🎉</div></div>`}
+     </div>
+     <div class="dw-acts"><button class="btn-ghost" id="dwClose" style="flex:1">Close</button></div>`;
+  dr.classList.add("show"); if(sc) sc.classList.add("show"); dr.setAttribute("aria-hidden","false"); modalOpen=true;
   $("#dwClose").onclick=closeTaskDrawer;
   dr.querySelectorAll(".dw-dep[data-go]").forEach(el=> el.onclick=()=>openTaskDrawer(el.dataset.go));
 }
