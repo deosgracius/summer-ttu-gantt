@@ -349,6 +349,40 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .rmtsub{font-size:10.5px; color:var(--mut); font-variant-numeric:tabular-nums; white-space:nowrap; flex:none}
 .rmempty{padding:34px 16px; text-align:center; color:var(--mut); font-size:13px}
 
+/* ============ TASK DETAIL DRAWER ============ */
+.drawer-scrim{position:fixed; inset:0; background:rgba(0,0,0,.42); opacity:0; pointer-events:none; transition:opacity .25s; z-index:190}
+.drawer-scrim.show{opacity:1; pointer-events:auto}
+.drawer{position:fixed; top:0; right:0; height:100vh; height:100dvh; width:min(430px,93vw); background:var(--panel-solid);
+  border-left:1px solid var(--line); box-shadow:-16px 0 48px rgba(0,0,0,.28); transform:translateX(100%);
+  transition:transform .3s var(--ease-out); z-index:200; display:flex; flex-direction:column; overflow:hidden}
+.drawer.show{transform:none}
+.dw-head{padding:20px 22px 15px; border-bottom:1px solid var(--line); flex:none}
+.dw-eyebrow{font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--mut)}
+.dw-title{font-size:18px; font-weight:750; margin:5px 0 0; letter-spacing:-.01em; color:var(--txt)}
+.dw-sub{margin-top:11px; display:flex; align-items:center; gap:8px}
+.dw-badge{margin-left:auto; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:700}
+.dw-body{padding:18px 22px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; flex:1}
+.dw-sec-label{font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--mut); margin-bottom:9px}
+.stepper{display:flex; flex-direction:column}
+.step{display:flex; gap:11px; align-items:flex-start; position:relative; padding-bottom:15px}
+.step:last-child{padding-bottom:0}
+.step:not(:last-child)::before{content:""; position:absolute; left:10px; top:21px; height:100%; width:2px; background:var(--line)}
+.step.done::before{background:var(--deo)}
+.step .sdot{width:21px; height:21px; border-radius:50%; flex:none; display:grid; place-items:center; border:2px solid var(--line); background:var(--panel-solid); font-size:10px; font-weight:800; color:var(--mut); z-index:1}
+.step.done .sdot{background:var(--deo); border-color:var(--deo); color:#fff}
+.step.cur .sdot{border-color:var(--deo); color:var(--deo); box-shadow:0 0 0 4px color-mix(in srgb,var(--deo) 20%,transparent)}
+.step .slab{font-size:13px; font-weight:600; color:var(--mut); padding-top:2px}
+.step.done .slab,.step.cur .slab{color:var(--txt)}
+.dw-grid{display:grid; grid-template-columns:1fr 1fr; gap:11px}
+.dw-field{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:9px 11px}
+.dw-field .k{font-size:10px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--mut)}
+.dw-field .v{font-size:14px; font-weight:650; color:var(--txt); margin-top:3px; display:flex; align-items:center; gap:7px}
+.dw-deps{display:flex; flex-direction:column; gap:6px}
+.dw-dep{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--txt2); padding:7px 9px; background:var(--panel2); border:1px solid var(--line); border-radius:8px; cursor:pointer}
+.dw-dep:hover{color:var(--txt); border-color:var(--line-strong)}
+.dw-acts{padding:15px 22px; border-top:1px solid var(--line); display:flex; gap:9px; flex:none}
+.dw-acts .btn-save{flex:1}
+
 /* ============ CONTROLS ============ */
 .controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px}
 .search{display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:0 11px}
@@ -1023,6 +1057,10 @@ input:focus-visible,select:focus-visible{outline:none}
     <button class="btn-del" id="tmDel">Delete</button>
   </div>
 </div></div>
+
+<!-- ============ TASK DETAIL DRAWER ============ -->
+<div class="drawer-scrim" id="drawerScrim"></div>
+<aside class="drawer" id="taskDrawer" aria-hidden="true"></aside>
 
 <!-- ============ SETTINGS MODAL ============ -->
 <div class="modal" id="setModal"><div class="sheet" role="dialog" aria-modal="true">
@@ -1891,7 +1929,7 @@ function render3D(canvas){
         .nodeLabel(n=>n.hasKids? (n.name+(n.kind!=='center'?' — click to open':'')) : n.name)
         .linkColor(l=>l.color).linkOpacity(.5).linkWidth(l=>l.cp?1.8:(l.dep?0.5:0.7))
         .linkDirectionalArrowLength(l=>l.dep?3.4:0).linkDirectionalArrowRelPos(1)
-        .onNodeClick(n=>{ if(n.kind==="task"){ if(n.tid) openTask(n.tid); }
+        .onNodeClick(n=>{ if(n.kind==="task"){ if(n.tid) openTaskDrawer(n.tid); }
           else if(n.hasKids){ orgToggle(n.nid); org3dGraph.graphData(orgGraphData()); } }); }
     org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
   }); }
@@ -1997,7 +2035,7 @@ function renderOrg(){
   svg+=`</g></svg>`;
   canvas.innerHTML=svg;
   canvas.querySelectorAll(".onode[data-oid]").forEach(el=>{
-    el.addEventListener("click",()=>openTask(el.dataset.oid));
+    el.addEventListener("click",()=>openTaskDrawer(el.dataset.oid));
     el.addEventListener("mousemove",ev=>showBarTip(el.dataset.oid, ev));
     el.addEventListener("mouseleave",hideTip);
   });
@@ -2068,7 +2106,7 @@ function renderModel(){
   });
   wrap.innerHTML = bar + (cards? `<div class="rmboard">${cards}</div>` : `<div class="rmempty">No tasks match the current filter.</div>`);
   wrap.querySelectorAll(".rmphase button").forEach(b=> b.onclick=()=>{ modelPhase=+b.dataset.ph; renderModel(); });
-  wrap.querySelectorAll(".rmtask[data-oid]").forEach(el=> el.onclick=()=>openTask(el.dataset.oid));
+  wrap.querySelectorAll(".rmtask[data-oid]").forEach(el=> el.onclick=()=>openTaskDrawer(el.dataset.oid));
 }
 
 /* ====================== RENDER ALL ====================== */
@@ -2141,6 +2179,43 @@ function renderDepsPicker(t){ const box=$("#f_deps"); if(!box) return;
     elig.filter(x=>x.section===sec).forEach(x=>{ const on=cur.has(x.id);
       h+=`<label class="depitem"><input type="checkbox" value="${x.id}"${on?" checked":""}><span>${esc(x.name)}</span></label>`; }); });
   box.innerHTML=h; }
+/* ---- task detail drawer (read view + lifecycle) ---- */
+function closeTaskDrawer(){ const dr=$("#taskDrawer"), sc=$("#drawerScrim");
+  if(dr){ dr.classList.remove("show"); dr.setAttribute("aria-hidden","true"); }
+  if(sc) sc.classList.remove("show"); modalOpen=false; }
+function openTaskDrawer(id){ const t=(tasks||[]).find(x=>x.id===id); if(!t) return;
+  const dr=$("#taskDrawer"), sc=$("#drawerScrim"); if(!dr) return;
+  const stColor=taskStatusColor(t), c=+t.comp||0;
+  const badge={done:"Done",behind:"Behind",progress:"In progress",next:"Upcoming"}[orgStatusKey(t)];
+  const stepIdx = c>=100?3 : c>=70?2 : c>0?1 : 0;
+  const stepper=["To do","In progress","Review","Done"].map((s,i)=>
+    `<div class="step ${i<stepIdx?'done':''} ${i===stepIdx?'cur':''}"><span class="sdot">${i<stepIdx?'✓':(i+1)}</span><span class="slab">${s}</span></div>`).join("");
+  const l0=(cfg.weeks[t.w0]||{}).label||('W'+(t.w0+1)), l1=(cfg.weeks[t.w1]||{}).label||('W'+(t.w1+1));
+  const range=t.w0===t.w1?l0:(l0+" – "+l1);
+  const depOn=(t.deps||[]).map(x=>tasks.find(y=>y.id===x)).filter(Boolean);
+  const blocks=(tasks||[]).filter(x=>(x.deps||[]).includes(t.id));
+  const depRow=x=>`<div class="dw-dep" data-go="${x.id}"><span class="rmdot" style="background:${taskStatusColor(x)}"></span><span class="rmtn">${esc(x.name)}</span>${avatarHTML(x.owner,18)}</div>`;
+  dr.innerHTML =
+    `<div class="dw-head"><div class="dw-eyebrow">${esc(t.section)}</div><h3 class="dw-title">${esc(t.name)}</h3>
+       <div class="dw-sub">${avatarHTML(t.owner,24)}<span style="font-size:13px;color:var(--txt2)">${esc(ownerCanon(t.owner))}</span>
+       <span class="dw-badge" style="background:color-mix(in srgb,${stColor} 16%,transparent);color:${stColor};border:1px solid color-mix(in srgb,${stColor} 45%,transparent)">${badge} · ${c}%</span></div></div>
+     <div class="dw-body">
+       <div><div class="dw-sec-label">Lifecycle</div><div class="stepper">${stepper}</div></div>
+       <div class="dw-grid">
+         <div class="dw-field"><div class="k">Schedule</div><div class="v">${esc(range)}</div></div>
+         <div class="dw-field"><div class="k">Completion</div><div class="v">${c}%</div></div>
+         <div class="dw-field"><div class="k">Est. hours</div><div class="v">${(+t.est_hours||0)}</div></div>
+         <div class="dw-field"><div class="k">Logged hours</div><div class="v">${(+t.logged_hours||0)}</div></div>
+       </div>
+       ${depOn.length?`<div><div class="dw-sec-label">Depends on (${depOn.length})</div><div class="dw-deps">${depOn.map(depRow).join("")}</div></div>`:""}
+       ${blocks.length?`<div><div class="dw-sec-label">Blocks (${blocks.length})</div><div class="dw-deps">${blocks.map(depRow).join("")}</div></div>`:""}
+     </div>
+     <div class="dw-acts"><button class="btn-save" id="dwEdit">Edit task</button><button class="btn-ghost" id="dwClose">Close</button></div>`;
+  dr.classList.add("show"); if(sc) sc.classList.add("show"); dr.setAttribute("aria-hidden","false"); modalOpen=true;
+  $("#dwEdit").onclick=()=>{ closeTaskDrawer(); openTask(id); };
+  $("#dwClose").onclick=closeTaskDrawer;
+  dr.querySelectorAll(".dw-dep[data-go]").forEach(el=> el.onclick=()=>openTaskDrawer(el.dataset.go));
+}
 function openTask(id){
   modalOpen=true; editingId=id; $("#tmErr").textContent="";
   const t = id? tasks.find(x=>x.id===id) : null;
@@ -2157,6 +2232,7 @@ function openTask(id){
 function closeTask(){modalOpen=false;editingId=null;$("#taskModal").classList.remove("show");}
 $("#tmCancel").onclick=closeTask;
 $("#taskModal").addEventListener("click",e=>{if(e.target.id==="taskModal")closeTask();});
+$("#drawerScrim").addEventListener("click",closeTaskDrawer);
 
 $("#tmSave").onclick=async()=>{
   let w0=+$("#f_w0").value,w1=+$("#f_w1").value; if(w1<w0){[w0,w1]=[w1,w0];}
@@ -2322,6 +2398,7 @@ let _rsT; window.addEventListener("resize",()=>{ clearTimeout(_rsT); _rsT=setTim
   if($("#grid")&&$("#grid").children.length){ const pw=NAMEW+"|"+COLW; gridDims(); if(NAMEW+"|"+COLW!==pw) renderGrid(); else placeOverlay(); }
 },160); });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){
+  if($("#taskDrawer").classList.contains("show"))closeTaskDrawer();
   if($("#taskModal").classList.contains("show"))closeTask();
   if($("#setModal").classList.contains("show"))closeSet();
   ["adminModal","auditModal","metricModal"].forEach(id=>{const m=$("#"+id); if(m&&m.classList.contains("show")){m.classList.remove("show");modalOpen=false;}});
