@@ -284,10 +284,12 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .orgcanvas:active{cursor:grabbing}
 .orgcanvas svg{width:100%; height:100%; display:block; user-select:none}
 .oedge{stroke:var(--line-strong); stroke-opacity:.55}
-.onode{cursor:pointer}
+.onode{cursor:default}
+.onode.clk{cursor:pointer}
 .onode circle{transition:stroke-width .12s}
-.onode:hover circle{stroke:var(--txt); stroke-width:2.5}
+.onode.clk:hover circle{stroke:var(--txt); stroke-width:2.5}
 .onode.dim{opacity:.16}
+.obadge{fill:#fff; font-size:10px; font-weight:800; pointer-events:none}
 .ocenter-label{fill:var(--txt); font-weight:800; font-size:13px}
 .osec-label{fill:var(--txt2); font-weight:700; font-size:11px}
 .otask-label{font-size:10px; font-weight:600; fill:var(--txt); paint-order:stroke; stroke:var(--panel-solid); stroke-width:2.6px; stroke-linejoin:round; pointer-events:none}
@@ -891,7 +893,7 @@ input:focus-visible,select:focus-visible{outline:none}
       </div>
       <button class="orgtog deptog" id="orgDeps" type="button" title="Show task dependencies & critical path">⛓ Dependencies</button>
       <button class="orgbtn" id="orgReset" type="button" title="Reset view">↺ Reset</button>
-      <span class="orghint">Scroll to zoom · drag to pan · click a node</span>
+      <span class="orghint">Click a node to open its branch · badge shows hidden count · click a task to edit</span>
       <button class="orgbtn" id="orgFull" type="button" title="Toggle full screen">⛶ Full screen</button>
     </div>
     <div class="orgcanvas" id="orgcanvas"></div>
@@ -1759,30 +1761,79 @@ function ensure3D(cb){ if(window.ForceGraph3D) return cb();
   s.onerror=()=>{ window.__l3d=null; toast("Couldn't load the 3D view (network)."); org3d=false;
     document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); };
   document.head.appendChild(s); }
-function orgGraphData(){
-  const all=tasks||[], byOwner=(orgColorBy==="owner");
-  const nodes=[{id:"__c",name:(cfg.project_name||cfg.title||"Project"),color:cssColor("var(--deo)"),val:10,kind:"center"}], links=[];
-  if(byOwner){
-    ownerList().forEach(o=>{ const oc=cssColor(ownerColor(o)); nodes.push({id:"o:"+o,name:o,color:oc,val:6,kind:"owner"}); links.push({source:"__c",target:"o:"+o,color:oc});
-      all.filter(t=>ownerCanon(t.owner)===o).forEach(t=>{ nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:cssColor(taskStatusColor(t)),val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:"o:"+o,target:t.id,color:oc}); }); });
+/* ---- hierarchy + progressive disclosure (collapse/expand) — shared by 2D & 3D ---- */
+let orgExpanded = new Set();   // ids of nodes the user has opened; the centre is always open
+function orgTree(){
+  const all=(tasks||[]).slice();
+  const proj=cfg.project_name||cfg.title||"Project";
+  const root={id:"__c", kind:"center", label:proj, children:[]};
+  if(orgColorBy==="owner"){
+    // project → member → section (main task group) → task (detailed split)
+    ownerList().forEach(o=>{
+      const mine=all.filter(t=>ownerCanon(t.owner)===o); if(!mine.length) return;
+      const m={id:"o:"+o, kind:"owner", label:o, owner:o, children:[]};
+      const secs=[]; mine.forEach(t=>{ if(!secs.includes(t.section)) secs.push(t.section); });
+      secs.forEach(s=>{
+        const sn={id:"o:"+o+"|s:"+s, kind:"section", label:s, owner:o, children:[]};
+        mine.filter(t=>t.section===s).forEach(t=> sn.children.push({id:"t"+t.id, kind:"task", label:t.name, owner:o, task:t, children:[]}));
+        m.children.push(sn);
+      });
+      root.children.push(m);
+    });
   } else {
-    sectionsOf(all).forEach((sec,i)=>{ const sid="s:"+i; nodes.push({id:sid,name:sec,color:cssColor("var(--txt2)"),val:5,kind:"section"}); links.push({source:"__c",target:sid,color:cssColor("var(--line-strong)")});
-      all.filter(t=>t.section===sec).forEach(t=>{ const c=cssColor(taskStatusColor(t)); nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:c,val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:sid,target:t.id,color:c}); }); });
+    // project → section → task
+    sectionsOf(all).forEach(s=>{
+      const sn={id:"s:"+s, kind:"section", label:s, children:[]};
+      all.filter(t=>t.section===s).forEach(t=> sn.children.push({id:"t"+t.id, kind:"task", label:t.name, task:t, children:[]}));
+      root.children.push(sn);
+    });
   }
-  if(orgDeps){ const ids=new Set(nodes.map(n=>n.id)); const {path,from}=criticalPath(all);
-    all.forEach(t=>(t.deps||[]).forEach(d=>{ if(!ids.has(d)||!ids.has(t.id)) return;
+  return root;
+}
+const orgHasKids = n => (n.children||[]).length>0;
+const orgIsOpen  = n => n.kind==="center" || orgExpanded.has(n.id);
+const orgVisKids = n => orgIsOpen(n) ? (n.children||[]) : [];
+function orgToggle(id){
+  if(id==="__c"){ orgExpanded.clear(); return; }          // clicking the project collapses everything
+  if(orgExpanded.has(id)){ orgExpanded.delete(id);        // collapsing a node also collapses its descendants
+    [...orgExpanded].forEach(x=>{ if(x.startsWith(id+"|")) orgExpanded.delete(x); }); }
+  else orgExpanded.add(id);
+}
+function orgNodeFill(n){ return n.kind==="center"?"var(--deo)"
+  : n.kind==="owner"? ownerColor(n.owner)
+  : n.kind==="section"? (orgColorBy==="owner"? ownerColor(n.owner) : "var(--txt2)")
+  : taskStatusColor(n.task); }
+function orgEdgeColor(parent,child){ return child.kind==="task"? taskStatusColor(child.task)
+  : ((child.kind==="owner"||child.kind==="section") && orgColorBy==="owner")? ownerColor(child.owner||parent.owner)
+  : "var(--line-strong)"; }
+function orgGraphData(){
+  const root=orgTree(); const nodes=[], links=[]; const visTask=new Set();
+  (function walk(node){
+    nodes.push({ id:node.id, nid:node.id, kind:node.kind,
+      name: node.kind==="task"? (node.label+" · "+(node.task.comp||0)+"%")
+           : (node.label + (orgHasKids(node)&&!orgIsOpen(node)? "  (+"+node.children.length+")":"")),
+      color: cssColor(orgNodeFill(node)),
+      val: node.kind==="center"?10:node.kind==="owner"?6:node.kind==="section"?4.5:2+(+node.task.comp||0)/40,
+      tid: node.kind==="task"? node.task.id : null, hasKids: orgHasKids(node) });
+    if(node.kind==="task") visTask.add(node.task.id);
+    orgVisKids(node).forEach(ch=>{ links.push({source:node.id, target:ch.id, color: cssColor(orgEdgeColor(node,ch))}); walk(ch); });
+  })(root);
+  if(orgDeps){ const {path,from}=criticalPath(tasks||[]);
+    (tasks||[]).forEach(t=>(t.deps||[]).forEach(d=>{ if(!visTask.has(t.id)||!visTask.has(d)) return;
       const cp=path.has(t.id)&&path.has(d)&&from[t.id]===d;
-      links.push({source:d, target:t.id, color: cp?cssColor("var(--deo)"):"#94a3b8", dep:true, cp}); })); }
+      links.push({source:"t"+d, target:"t"+t.id, color: cp?cssColor("var(--deo)"):"#94a3b8", dep:true, cp}); })); }
   return {nodes,links}; }
 function render3D(canvas){
   ensure3D(()=>{
     if(!org3d) return;
     if(!org3dGraph){ canvas.innerHTML="";
-      org3dGraph=ForceGraph3D()(canvas).backgroundColor("rgba(0,0,0,0)").showNavInfo(false)
-        .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeLabel(n=>n.name).nodeOpacity(.95)
+      org3dGraph=ForceGraph3D()(canvas).backgroundColor("rgba(0,0,0,0)").showNavInfo(true)
+        .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeOpacity(.95)
+        .nodeLabel(n=>n.hasKids? (n.name+(n.kind!=='center'?' — click to open':'')) : n.name)
         .linkColor(l=>l.color).linkOpacity(.5).linkWidth(l=>l.cp?1.8:(l.dep?0.5:0.7))
         .linkDirectionalArrowLength(l=>l.dep?3.4:0).linkDirectionalArrowRelPos(1)
-        .onNodeClick(n=>{ if(n.tid) openTask(n.tid); }); }
+        .onNodeClick(n=>{ if(n.kind==="task"){ if(n.tid) openTask(n.tid); }
+          else if(n.hasKids){ orgToggle(n.nid); org3dGraph.graphData(orgGraphData()); } }); }
     org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
   }); }
 function renderOrgLegend(byOwner){ const el=$("#orglegend"); if(!el) return; const sc=statusColors();
@@ -1799,84 +1850,63 @@ function renderOrg(){
   renderOrgLegend(byOwner);
   if(org3d){ render3D(canvas); return; }
   teardown3D(); if(canvas.querySelector("canvas")) canvas.innerHTML="";
-  const all=tasks||[];
   const trunc=(s,m)=>{ s=String(s||""); return s.length>m ? s.slice(0,m-1)+"…" : s; };
+  const root=orgTree();
+  // ---- radial tidy layout of ONLY the currently-visible (expanded) nodes ----
+  const RING=[0,250,505,760];
+  const rad=d=> d<RING.length? RING[d] : RING[RING.length-1]+(d-RING.length+1)*245;
   const nodes=[], edges=[], byId={};
-  const proj=cfg.project_name||cfg.title||"Project";
-  nodes.push({id:"__c", kind:"center", x:0, y:0, r:32, label:proj});
-  if(byOwner){
-    // project → each member (+Shared) → their tasks  (links colored per member)
-    const owners=ownerList(), nO=Math.max(1,owners.length), R1=320;
-    owners.forEach((o,i)=>{
-      const ang=(i/nO)*Math.PI*2 - Math.PI/2;
-      const ox=Math.cos(ang)*R1, oy=Math.sin(ang)*R1, oid="o"+i, oc=ownerColor(o);
-      const items=all.filter(t=>ownerCanon(t.owner)===o), n=items.length;
-      nodes.push({id:oid, kind:"owner", x:ox, y:oy, r:21, label:o, owner:o});
-      edges.push({a:"__c", b:oid, w:2.8, color:oc});
-      const spread=Math.min(Math.PI*1.25, 0.5 + n*0.13), R2=100 + Math.min(140, n*5.5);
-      items.forEach((t,j)=>{
-        const a2=ang + (n>1 ? (j/(n-1)-0.5)*spread : 0), rr=R2 + ((j%2)?20:0);
-        nodes.push({id:"t"+t.id, kind:"task", x:ox+Math.cos(a2)*rr, y:oy+Math.sin(a2)*rr, pax:ox, pay:oy, r:5+Math.round((+t.comp||0)/100*5), task:t});
-        edges.push({a:oid, b:"t"+t.id, w:1.3, color:oc});
-      });
-    });
-  } else {
-    // project → each section → its tasks  (links colored by task status)
-    const secs=sectionsOf(all), nSec=Math.max(1,secs.length), R1=290;
-    secs.forEach((sec,i)=>{
-      const ang=(i/nSec)*Math.PI*2 - Math.PI/2;
-      const sx=Math.cos(ang)*R1, sy=Math.sin(ang)*R1, sid="s"+i;
-      const items=all.filter(t=>t.section===sec), n=items.length;
-      nodes.push({id:sid, kind:"section", x:sx, y:sy, r:16, label:sec});
-      edges.push({a:"__c", b:sid, w:2.2, color:"var(--line-strong)"});
-      const spread=Math.min(Math.PI*1.2, 0.5 + n*0.14), R2=86 + Math.min(110, n*5);
-      items.forEach((t,j)=>{
-        const a2=ang + (n>1 ? (j/(n-1)-0.5)*spread : 0), rr=R2 + ((j%2)?18:0);
-        nodes.push({id:"t"+t.id, kind:"task", x:sx+Math.cos(a2)*rr, y:sy+Math.sin(a2)*rr, pax:sx, pay:sy, r:5+Math.round((+t.comp||0)/100*5), task:t});
-        edges.push({a:sid, b:"t"+t.id, w:1, color:taskStatusColor(t)});
-      });
-    });
-  }
+  const leaves=node=>{ const c=orgVisKids(node); if(!c.length) return 1; return c.reduce((s,ch)=>s+leaves(ch),0); };
+  (function place(node,depth,a0,a1,parent){
+    const ang=(a0+a1)/2 - Math.PI/2, r=rad(depth);
+    node.x=Math.cos(ang)*r; node.y=Math.sin(ang)*r; node.depth=depth;
+    node.rr = node.kind==="center"?30 : node.kind==="owner"?20 : node.kind==="section"?14 : 5+Math.round((+node.task.comp||0)/100*5);
+    if(parent){ node.pax=parent.x; node.pay=parent.y; }
+    nodes.push(node);
+    const c=orgVisKids(node); if(!c.length) return;
+    const tot=c.reduce((s,ch)=>s+leaves(ch),0)||1; let a=a0;
+    c.forEach(ch=>{ const span=(a1-a0)*leaves(ch)/tot; edges.push({a:node,b:ch}); place(ch,depth+1,a,a+span,node); a+=span; });
+  })(root,0,0,Math.PI*2,null);
   nodes.forEach(n=>byId[n.id]=n);
-  // node fill ALWAYS encodes task status (owner is shown by the branch/line colour instead)
-  const nodeColor=n=> n.kind==="center"?"var(--deo)" : n.kind==="section"?"var(--txt2)"
-    : n.kind==="owner"?ownerColor(n.owner) : taskStatusColor(n.task);
-  // precompute a radial, rotated label for every task node so each one is identifiable
+  // radial rotated labels for task leaves
   nodes.forEach(n=>{ if(n.kind!=="task") return;
-    const dx=n.x-n.pax, dy=n.y-n.pay, ang=Math.atan2(dy,dx)||0;
-    const gap=n.r+5, lx=n.x+Math.cos(ang)*gap, ly=n.y+Math.sin(ang)*gap;
-    const deg=ang*180/Math.PI, flip=(deg>90||deg<-90), txt=trunc(n.task.name,20);
-    const len=txt.length*5.6+6;
-    n._lab={lx,ly, deg:(flip?deg+180:deg), anchor:(flip?"end":"start"), txt,
-      fx:lx+Math.cos(ang)*len, fy:ly+Math.sin(ang)*len}; });
-  // auto-fit viewBox so the graph (and its labels) fills the canvas
+    const dx=n.x-(n.pax||0), dy=n.y-(n.pay||0), ang=Math.atan2(dy,dx)||0;
+    const gap=n.rr+5, lx=n.x+Math.cos(ang)*gap, ly=n.y+Math.sin(ang)*gap;
+    const deg=ang*180/Math.PI, flip=(deg>90||deg<-90), txt=trunc(n.task.name,20), len=txt.length*5.6+6;
+    n._lab={lx,ly,deg:(flip?deg+180:deg),anchor:(flip?"end":"start"),txt,fx:lx+Math.cos(ang)*len,fy:ly+Math.sin(ang)*len}; });
+  // auto-fit viewBox
   let mnX=1e9,mnY=1e9,mxX=-1e9,mxY=-1e9;
   const ext=(x,y)=>{ mnX=Math.min(mnX,x); mxX=Math.max(mxX,x); mnY=Math.min(mnY,y); mxY=Math.max(mxY,y); };
-  nodes.forEach(n=>{ const p=n.r+(n.kind!=="task"?24:5); ext(n.x-p,n.y-p); ext(n.x+p,n.y+p);
+  nodes.forEach(n=>{ const p=n.rr+(n.kind!=="task"?26:5); ext(n.x-p,n.y-p); ext(n.x+p,n.y+p);
     if(n._lab){ ext(n._lab.lx,n._lab.ly); ext(n._lab.fx,n._lab.fy); } });
-  const P=44; mnX-=P; mnY-=P; mxX+=P; mxY+=P;
+  const P=46; mnX-=P; mnY-=P; mxX+=P; mxY+=P;
   let svg=`<svg viewBox="${mnX.toFixed(0)} ${mnY.toFixed(0)} ${(mxX-mnX).toFixed(0)} ${(mxY-mnY).toFixed(0)}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Project organization graph"><defs><marker id="deparrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker><marker id="cparrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--deo)"/></marker></defs><g id="orgpan" transform="translate(${orgPanX},${orgPanY}) scale(${orgZoom})">`;
-  edges.forEach(e=>{ const a=byId[e.a], b=byId[e.b]; if(!a||!b) return;
-    const t=byId[e.b]; const faded=(t.kind==="task" && !orgMatch(t.task));
-    svg+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${e.color}" stroke-opacity="${faded?0.08:0.55}" style="stroke-width:${e.w}"/>`; });
-  // dependency overlay (dashed) + critical path (solid accent)
-  if(orgDeps){ const {path:cpPath, from:cpFrom}=criticalPath(all);
-    all.forEach(t=>{ (t.deps||[]).forEach(d=>{ const a=byId["t"+d], b=byId["t"+t.id]; if(!a||!b) return;
+  // structure edges
+  edges.forEach(e=>{ const a=e.a, b=e.b; const faded=(b.kind==="task" && !orgMatch(b.task));
+    svg+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${orgEdgeColor(a,b)}" stroke-opacity="${faded?0.08:0.5}" style="stroke-width:${b.kind==='task'?1:2.2}"/>`; });
+  // dependency overlay (only between currently-visible task nodes)
+  if(orgDeps){ const {path:cpPath, from:cpFrom}=criticalPath(tasks||[]);
+    (tasks||[]).forEach(t=>{ (t.deps||[]).forEach(d=>{ const a=byId["t"+d], b=byId["t"+t.id]; if(!a||!b) return;
       const onCP=cpPath.has(t.id)&&cpPath.has(d)&&cpFrom[t.id]===d;
       const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
-      const ax=(a.x+ux*(a.r+2)).toFixed(1), ay=(a.y+uy*(a.r+2)).toFixed(1);
-      const bx=(b.x-ux*(b.r+4)).toFixed(1), by=(b.y-uy*(b.r+4)).toFixed(1);
-      const faded=(!orgMatch(a.task)||!orgMatch(b.task));
-      svg+=`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${onCP?'var(--deo)':'#94a3b8'}" stroke-opacity="${faded?0.06:(onCP?0.95:0.42)}" stroke-dasharray="${onCP?'':'4 3'}" style="stroke-width:${onCP?2.4:1.1}" marker-end="url(#${onCP?'cparrow':'deparrow'})"/>`;
+      const ax=(a.x+ux*(a.rr+2)).toFixed(1), ay=(a.y+uy*(a.rr+2)).toFixed(1);
+      const bx=(b.x-ux*(b.rr+4)).toFixed(1), by=(b.y-uy*(b.rr+4)).toFixed(1);
+      svg+=`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${onCP?'var(--deo)':'#94a3b8'}" stroke-opacity="${onCP?0.95:0.42}" stroke-dasharray="${onCP?'':'4 3'}" style="stroke-width:${onCP?2.4:1.1}" marker-end="url(#${onCP?'cparrow':'deparrow'})"/>`;
     }); }); }
+  // nodes
   nodes.forEach(n=>{
-    const dim=(n.kind==="task" && !orgMatch(n.task))?" dim":"";
-    svg+=`<g class="onode${dim}"${n.kind==="task"?` data-oid="${n.task.id}"`:""}>`;
-    svg+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.r}" fill="${nodeColor(n)}" stroke="var(--panel-solid)" stroke-width="1.5"/>`;
-    if(n.kind==="center") svg+=`<text class="ocenter-label" x="${n.x}" y="${(n.y+n.r+17).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
-    else if(n.kind==="section"||n.kind==="owner") svg+=`<text class="osec-label" x="${n.x}" y="${(n.y-n.r-7).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
+    const isTask=n.kind==="task", closed=orgHasKids(n)&&!orgIsOpen(n)&&n.kind!=="center";
+    const dim=(isTask && !orgMatch(n.task))?" dim":"";
+    const clickable=isTask||orgHasKids(n);
+    svg+=`<g class="onode${dim}${clickable?' clk':''}"${isTask?` data-oid="${n.task.id}"`:` data-nid="${esc(n.id)}"`}>`;
+    if(closed) svg+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.rr+4}" fill="none" stroke="${orgNodeFill(n)}" stroke-opacity=".55" stroke-dasharray="2 3" style="stroke-width:1.5"/>`;
+    svg+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.rr}" fill="${orgNodeFill(n)}" stroke="var(--panel-solid)" stroke-width="1.5"/>`;
+    if(n.kind==="center") svg+=`<text class="ocenter-label" x="${n.x}" y="${(n.y+n.rr+17).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
+    else if(n.kind==="owner"||n.kind==="section") svg+=`<text class="osec-label" x="${n.x}" y="${(n.y-n.rr-7).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
     else if(n._lab){ const L=n._lab;
       svg+=`<text class="otask-label" x="${L.lx.toFixed(1)}" y="${L.ly.toFixed(1)}" text-anchor="${L.anchor}" dominant-baseline="middle" transform="rotate(${L.deg.toFixed(1)} ${L.lx.toFixed(1)} ${L.ly.toFixed(1)})">${esc(L.txt)}</text>`; }
+    if(closed){ const bx=(n.x+n.rr*0.72).toFixed(1), by=(n.y-n.rr*0.72).toFixed(1);
+      svg+=`<circle cx="${bx}" cy="${by}" r="8.5" fill="var(--deo)" stroke="var(--panel-solid)" stroke-width="1.5"/><text class="obadge" x="${bx}" y="${by}" text-anchor="middle" dominant-baseline="central">${n.children.length}</text>`; }
     svg+=`</g>`;
   });
   svg+=`</g></svg>`;
@@ -1886,22 +1916,26 @@ function renderOrg(){
     el.addEventListener("mousemove",ev=>showBarTip(el.dataset.oid, ev));
     el.addEventListener("mouseleave",hideTip);
   });
+  canvas.querySelectorAll(".onode[data-nid]").forEach(el=>{
+    el.addEventListener("click",()=>{ orgToggle(el.dataset.nid); renderOrg(); });
+  });
   bindOrgPanZoom(canvas);
 }
 function applyOrgTransform(g){ if(g) g.setAttribute("transform",`translate(${orgPanX},${orgPanY}) scale(${orgZoom})`); }
 function bindOrgPanZoom(canvas){
   const g=canvas.querySelector("#orgpan");
   canvas.onwheel=e=>{ e.preventDefault(); orgZoom=Math.max(0.4,Math.min(3, orgZoom*(e.deltaY<0?1.12:0.9))); applyOrgTransform(g); };
-  canvas.onmousedown=e=>{ if(e.target.closest(".onode[data-oid]")) return; const sx=e.clientX, sy=e.clientY, px=orgPanX, py=orgPanY;
+  canvas.onmousedown=e=>{ if(e.target.closest(".onode.clk")) return; const sx=e.clientX, sy=e.clientY, px=orgPanX, py=orgPanY;
     const mv=ev=>{ orgPanX=px+(ev.clientX-sx); orgPanY=py+(ev.clientY-sy); applyOrgTransform(g); };
     const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
     document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
 }
-document.querySelectorAll(".orgtog").forEach(b=>b.onclick=()=>{ orgColorBy=b.dataset.org; localStorage.setItem("eh_orgcolor",orgColorBy);
-  document.querySelectorAll(".orgtog").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
+document.querySelectorAll(".orgtog[data-org]").forEach(b=>b.onclick=()=>{ orgColorBy=b.dataset.org; localStorage.setItem("eh_orgcolor",orgColorBy);
+  orgExpanded.clear();   // node ids differ between owner/status hierarchies
+  document.querySelectorAll(".orgtog[data-org]").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
 { const db=$("#orgDeps"); if(db) db.onclick=()=>{ orgDeps=!orgDeps; db.classList.toggle("on",orgDeps);
     if(org3d && org3dGraph) org3dGraph.graphData(orgGraphData()); else renderOrg(); }; }
-{ const rb=$("#orgReset"); if(rb) rb.onclick=()=>{ orgZoom=1; orgPanX=0; orgPanY=0; renderOrg(); }; }
+{ const rb=$("#orgReset"); if(rb) rb.onclick=()=>{ orgZoom=1; orgPanX=0; orgPanY=0; orgExpanded.clear(); renderOrg(); }; }
 function orgToggleFull(){ const w=$("#orgview"); const on=w.classList.toggle("full");
   const b=$("#orgFull"); if(b) b.textContent = on?"⛶ Exit full screen":"⛶ Full screen";
   setTimeout(renderOrg,30); }
