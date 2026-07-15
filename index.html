@@ -279,8 +279,23 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .orgbtn{padding:6px 11px; border-radius:8px; font-size:12px; font-weight:600; background:var(--panel2); border:1px solid var(--line); color:var(--txt2); cursor:pointer}
 .orgbtn:hover{color:var(--txt); border-color:var(--line-strong)}
 .orgwrap.full{position:fixed; inset:0; z-index:160; border-radius:0; margin:0; height:100vh; display:flex; flex-direction:column}
+.orgwrap.full .orgmain{flex:1; min-height:0}
 .orgwrap.full .orgcanvas{height:auto; flex:1}
-.orgcanvas{height:min(78vh,760px); overflow:hidden; cursor:grab; background:radial-gradient(circle at 50% 46%, color-mix(in srgb,var(--deo) 7%,transparent), transparent 64%)}
+.orgmain{display:flex; align-items:stretch}
+.orgside{width:196px; flex:none; border-right:1px solid var(--line); overflow-y:auto; padding:11px 10px; background:var(--panel)}
+.orgside .osgroup{font-size:9.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--mut); margin:12px 4px 5px}
+.orgside .osgroup:first-child{margin-top:0}
+.orgside .osrow{display:flex; align-items:center; gap:8px; width:100%; padding:6px 7px; border:0; background:transparent; border-radius:7px; cursor:default; color:var(--txt2); font-size:12.5px; text-align:left}
+.orgside .osrow .ossw{width:9px; height:9px; border-radius:50%; flex:none}
+.orgside .osrow .osn{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.orgside .osrow .osc{font-size:11px; font-weight:700; color:var(--mut); font-variant-numeric:tabular-nums}
+.orgside .osrow.clk{cursor:pointer}
+.orgside .osrow.clk:hover{background:color-mix(in srgb,var(--deo) 9%,transparent)}
+.orgside .osrow.on{background:color-mix(in srgb,var(--deo) 15%,var(--panel-solid)); color:var(--txt); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 40%,var(--line-strong))}
+.orgside .osbtns{display:flex; gap:6px; margin-bottom:4px}
+.orgside .osbtns button{flex:1; padding:6px 4px; font-size:11px; font-weight:600; border:1px solid var(--line); background:var(--panel2); color:var(--txt2); border-radius:7px; cursor:pointer}
+.orgside .osbtns button:hover{border-color:var(--line-strong); color:var(--txt)}
+.orgcanvas{flex:1; height:min(78vh,760px); overflow:hidden; cursor:grab; background:radial-gradient(circle at 50% 46%, color-mix(in srgb,var(--deo) 7%,transparent), transparent 64%)}
 .orgcanvas:active{cursor:grabbing}
 .orgcanvas svg{width:100%; height:100%; display:block; user-select:none}
 .oedge{stroke:var(--line-strong); stroke-opacity:.55}
@@ -294,7 +309,7 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .osec-label{fill:var(--txt2); font-weight:700; font-size:11px}
 .otask-label{font-size:10px; font-weight:600; fill:var(--txt); paint-order:stroke; stroke:var(--panel-solid); stroke-width:2.6px; stroke-linejoin:round; pointer-events:none}
 /* organization legend overlay */
-.orglegend{position:absolute; left:12px; bottom:12px; display:flex; flex-wrap:wrap; gap:6px 13px; align-items:center;
+.orglegend{position:absolute; left:206px; bottom:12px; display:flex; flex-wrap:wrap; gap:6px 13px; align-items:center;
   padding:8px 12px; border-radius:10px; background:color-mix(in srgb,var(--panel-solid) 90%,transparent);
   border:1px solid var(--line); box-shadow:var(--card-shadow); font-size:11px; color:var(--txt2); pointer-events:none; max-width:min(94%,560px); z-index:2}
 .orglegend .lg{display:inline-flex; align-items:center; gap:5px; white-space:nowrap}
@@ -929,7 +944,10 @@ input:focus-visible,select:focus-visible{outline:none}
       <span class="orghint">Click a node to open its branch · badge shows hidden count · click a task to edit</span>
       <button class="orgbtn" id="orgFull" type="button" title="Toggle full screen">⛶ Full screen</button>
     </div>
-    <div class="orgcanvas" id="orgcanvas"></div>
+    <div class="orgmain">
+      <div class="orgside" id="orgside"></div>
+      <div class="orgcanvas" id="orgcanvas"></div>
+    </div>
     <div class="orglegend" id="orglegend" style="display:none"></div>
   </div>
 
@@ -1767,6 +1785,11 @@ function orgMatch(t){
   if(filterOwner!=="All" && ownerCanon(t.owner)!==filterOwner) return false;
   if(filterText && !((t.name+" "+t.section).toLowerCase().includes(filterText))) return false;
   return true; }
+/* sidebar status filter (the "Organisation Brain" left panel) */
+let orgStatus=null;   // null | 'done' | 'progress' | 'behind' | 'next'
+function orgStatusKey(t){ const c=+t.comp||0; if(c>=100) return "done";
+  if(t.w1<cfg.now_week) return "behind"; if(t.w0<=cfg.now_week && cfg.now_week<=t.w1) return "progress"; return "next"; }
+function orgTaskShown(t){ return orgMatch(t) && (!orgStatus || orgStatusKey(t)===orgStatus); }
 /* ---- dependencies & critical path ---- */
 let orgDeps=false;
 // longest chain through the dependency DAG (by task duration in weeks) → the critical path
@@ -1848,7 +1871,7 @@ function orgGraphData(){
     nodes.push({ id:node.id, nid:node.id, kind:node.kind,
       name: node.kind==="task"? (node.label+" · "+(node.task.comp||0)+"%")
            : (node.label + (orgHasKids(node)&&!orgIsOpen(node)? "  (+"+node.children.length+")":"")),
-      color: cssColor(orgNodeFill(node)),
+      color: (node.kind==="task" && !orgTaskShown(node.task))? "#3a3f4a" : cssColor(orgNodeFill(node)),
       val: node.kind==="center"?10:node.kind==="owner"?6:node.kind==="section"?4.5:2+(+node.task.comp||0)/40,
       tid: node.kind==="task"? node.task.id : null, hasKids: orgHasKids(node) });
     if(node.kind==="task") visTask.add(node.task.id);
@@ -1872,6 +1895,32 @@ function render3D(canvas){
           else if(n.hasKids){ orgToggle(n.nid); org3dGraph.graphData(orgGraphData()); } }); }
     org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
   }); }
+function orgExpandAll(){ orgExpanded.clear(); (function w(n){ if(orgHasKids(n)&&n.kind!=="center") orgExpanded.add(n.id); (n.children||[]).forEach(w); })(orgTree()); }
+function orgCollapseAll(){ orgExpanded.clear(); }
+function renderOrgSide(){ const el=$("#orgside"); if(!el) return;
+  const all=tasks||[], sc=statusColors(); const st={done:0,progress:0,behind:0,next:0};
+  all.forEach(t=>{ st[orgStatusKey(t)]++; });
+  const members=ownerList().filter(o=>all.some(t=>ownerCanon(t.owner)===o)).length;
+  const sections=sectionsOf(all).length, owner=(orgColorBy==="owner");
+  const typeRow=(color,label,count)=>`<div class="osrow"><span class="ossw" style="background:${color}"></span><span class="osn">${esc(label)}</span><span class="osc">${count}</span></div>`;
+  const statRow=(key,color,label,count)=>`<button class="osrow clk${orgStatus===key?' on':''}" data-st="${key}"><span class="ossw" style="background:${color}"></span><span class="osn">${label}</span><span class="osc">${count}</span></button>`;
+  el.innerHTML =
+    `<div class="osbtns"><button data-act="expand">Expand all</button><button data-act="collapse">Collapse all</button></div>`+
+    `<div class="osgroup">Overview</div>`+
+    (owner? typeRow("var(--deo)","Members",members) : "")+
+    typeRow("#94a3b8","Sections",sections)+
+    typeRow(sc.progress,"Tasks",all.length)+
+    `<div class="osgroup">Status — click to filter</div>`+
+    statRow("done",sc.done,"Done",st.done)+
+    statRow("progress",sc.progress,"In progress",st.progress)+
+    statRow("behind",sc.behind,"Behind",st.behind)+
+    statRow("next",sc.next,"Upcoming",st.next);
+  el.querySelectorAll(".osrow.clk").forEach(b=> b.onclick=()=>{ const was=(orgStatus===b.dataset.st);
+    orgStatus = was? null : b.dataset.st; if(!was) orgExpandAll();
+    if(org3d && org3dGraph){ org3dGraph.graphData(orgGraphData()); renderOrgSide(); } else renderOrg(); });
+  el.querySelectorAll(".osbtns button").forEach(b=> b.onclick=()=>{ if(b.dataset.act==="expand") orgExpandAll(); else orgCollapseAll();
+    if(org3d && org3dGraph){ org3dGraph.graphData(orgGraphData()); renderOrgSide(); } else renderOrg(); });
+}
 function renderOrgLegend(byOwner){ const el=$("#orglegend"); if(!el) return; const sc=statusColors();
   const dot=(c,l)=>`<span class="lg"><span class="sw" style="background:${c}"></span>${l}</span>`;
   let h=dot(sc.done,"Done")+dot(sc.progress,"In progress")+dot(sc.behind,"Behind")+dot(sc.next,"Upcoming");
@@ -1883,7 +1932,7 @@ function renderOrgLegend(byOwner){ const el=$("#orglegend"); if(!el) return; con
 function renderOrg(){
   const canvas=$("#orgcanvas"); if(!canvas) return;
   const byOwner=(orgColorBy==="owner");
-  renderOrgLegend(byOwner);
+  renderOrgLegend(byOwner); renderOrgSide();
   if(org3d){ render3D(canvas); return; }
   teardown3D(); if(canvas.querySelector("canvas")) canvas.innerHTML="";
   const trunc=(s,m)=>{ s=String(s||""); return s.length>m ? s.slice(0,m-1)+"…" : s; };
@@ -1918,7 +1967,7 @@ function renderOrg(){
   const P=46; mnX-=P; mnY-=P; mxX+=P; mxY+=P;
   let svg=`<svg viewBox="${mnX.toFixed(0)} ${mnY.toFixed(0)} ${(mxX-mnX).toFixed(0)} ${(mxY-mnY).toFixed(0)}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Project organization graph"><defs><marker id="deparrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker><marker id="cparrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--deo)"/></marker></defs><g id="orgpan" transform="translate(${orgPanX},${orgPanY}) scale(${orgZoom})">`;
   // structure edges
-  edges.forEach(e=>{ const a=e.a, b=e.b; const faded=(b.kind==="task" && !orgMatch(b.task));
+  edges.forEach(e=>{ const a=e.a, b=e.b; const faded=(b.kind==="task" && !orgTaskShown(b.task));
     svg+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${orgEdgeColor(a,b)}" stroke-opacity="${faded?0.08:0.5}" style="stroke-width:${b.kind==='task'?1:2.2}"/>`; });
   // dependency overlay (only between currently-visible task nodes)
   if(orgDeps){ const {path:cpPath, from:cpFrom}=criticalPath(tasks||[]);
@@ -1932,7 +1981,7 @@ function renderOrg(){
   // nodes
   nodes.forEach(n=>{
     const isTask=n.kind==="task", closed=orgHasKids(n)&&!orgIsOpen(n)&&n.kind!=="center";
-    const dim=(isTask && !orgMatch(n.task))?" dim":"";
+    const dim=(isTask && !orgTaskShown(n.task))?" dim":"";
     const clickable=isTask||orgHasKids(n);
     svg+=`<g class="onode${dim}${clickable?' clk':''}"${isTask?` data-oid="${n.task.id}"`:` data-nid="${esc(n.id)}"`}>`;
     if(closed) svg+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.rr+4}" fill="none" stroke="${orgNodeFill(n)}" stroke-opacity=".55" stroke-dasharray="2 3" style="stroke-width:1.5"/>`;
