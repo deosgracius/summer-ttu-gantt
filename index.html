@@ -1117,6 +1117,9 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 /* ---- member-based owners (names come from registration) + Shared ---- */
 const OWNER_PALETTE = ["#0ea5e9","#8b5cf6","#ec4899","#14b8a6","#f97316","#6366f1","#84cc16","#e11d48"];
+/* distinct colour per section (department-style hubs, like the reference brain) */
+const SECTION_PALETTE = ["#f59e0b","#22c55e","#3b82f6","#14b8a6","#ec4899","#ef4444","#8b5cf6","#f97316","#06b6d4","#a3e635","#a855f7","#eab308","#10b981","#f43f5e"];
+function sectionColor(sec){ const i=(typeof sectionsOf==="function"?sectionsOf(tasks||[]):[]).indexOf(sec); return SECTION_PALETTE[(i<0?0:i)%SECTION_PALETTE.length]; }
 function memberList(){ return (cfg.members||[]).slice(); }
 function ownerList(){ const o=memberList(); o.push("Shared"); return o; }
 function ownerCanon(o){ return (o==="Both")?"Shared":(o||"Shared"); }
@@ -1880,10 +1883,10 @@ function node3DObject(n){ if(!window.SpriteText) return null;
   s.color=lblCol; s.textHeight = n.kind==="center"?7 : n.kind==="owner"?5.2 : n.kind==="section"?3.8 : 2.8;
   s.fontWeight=(n.kind==="task")?"500":"700"; s.backgroundColor=false; s.padding=0;
   s.strokeColor=halo; s.strokeWidth=0.9; s.material.depthWrite=false;
-  s.position.set(0, (n.kind==="center"?13 : n.kind==="owner"?12 : n.kind==="section"?7.5 : 6.5), 0);
+  s.position.set(0, (n.kind==="center"?12 : n.kind==="owner"?15 : n.kind==="section"?13 : 6.5), 0);
   grp.add(s);
   if(n.av){
-    if(n.kind==="owner"){ grp.add(avatar3DSprite(n.av, n.avColor||n.color, 14)); }              // member = avatar disc
+    if(n.kind==="owner"){ grp.add(avatar3DSprite(n.av, n.avColor||n.color, 18)); }              // member = avatar disc
     else if(n.kind==="task"){ const av=avatar3DSprite(n.av, n.avColor||n.color, 5); av.position.set(3.6,3.6,1); grp.add(av); } // small owner badge on the task
   }
   return grp; }
@@ -1927,11 +1930,15 @@ function orgToggle(id){
 }
 function orgNodeFill(n){ return n.kind==="center"?"var(--deo)"
   : n.kind==="owner"? ownerColor(n.owner)
-  : n.kind==="section"? (orgColorBy==="owner"? ownerColor(n.owner) : "var(--txt2)")
+  : n.kind==="section"? (orgColorBy==="owner"? ownerColor(n.owner) : sectionColor(n.label))
   : taskStatusColor(n.task); }
-function orgEdgeColor(parent,child){ return child.kind==="task"? taskStatusColor(child.task)
-  : ((child.kind==="owner"||child.kind==="section") && orgColorBy==="owner")? ownerColor(child.owner||parent.owner)
-  : "var(--line-strong)"; }
+function orgEdgeColor(parent,child){
+  if(child.kind==="task") return taskStatusColor(child.task);
+  if(child.kind==="owner"||child.kind==="section"){
+    if(orgColorBy==="owner") return ownerColor(child.owner||parent.owner);
+    if(child.kind==="section") return sectionColor(child.label);
+  }
+  return "var(--line-strong)"; }
 // fixed radial positions (same tidy layout as 2D) so the 3D brain sits in clean rings, not a scattered cloud
 function orgLayoutPositions(){
   const root=orgTree(), RING=[0,250,505,760], S=0.17;
@@ -1951,7 +1958,7 @@ function orgGraphData(){
       name: node.kind==="task"? (node.label+" · "+(node.task.comp||0)+"%")
            : (node.label + (orgHasKids(node)&&!orgIsOpen(node)? "  (+"+node.children.length+")":"")),
       color: (node.kind==="task" && !orgTaskShown(node.task))? "#3a3f4a" : cssColor(orgNodeFill(node)),
-      val: node.kind==="center"?10:node.kind==="owner"?6:node.kind==="section"?4.5:2+(+node.task.comp||0)/40,
+      val: node.kind==="center"?7 : node.kind==="owner"?11 : node.kind==="section"?9 : 2+(+node.task.comp||0)/40,
       tid: node.kind==="task"? node.task.id : null, hasKids: orgHasKids(node),
       av: node.kind==="owner"? initials(node.label) : node.kind==="task"? initials(ownerCanon(node.task.owner)) : null,
       avColor: node.kind==="owner"? cssColor(ownerColor(node.label)) : node.kind==="task"? cssColor(ownerColor(node.task.owner)) : null });
