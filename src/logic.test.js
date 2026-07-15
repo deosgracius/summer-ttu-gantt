@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ownerCanon, sharedLoggedHours, memberLogged, syncLaborHours, rentalExempt,
   pDate, projectDays, calcBudget, sigOf, hpLev, hpCorrect, cmdkFuzzy,
-  dashStats, overdueTasks, dueSoonTasks, inProgressCount
+  dashStats, overdueTasks, dueSoonTasks, inProgressCount, criticalPath
 } from "./logic.js";
 
 describe("ownerCanon", () => {
@@ -225,5 +225,33 @@ describe("fuzzy matching", () => {
     expect(cmdkFuzzy("Go to Budget", "budget")).toBeGreaterThan(cmdkFuzzy("Go to Budget", "gtb"));
     expect(cmdkFuzzy("Go to Budget", "gtb")).toBe(20);
     expect(cmdkFuzzy("Go to Budget", "xyz")).toBe(-1);
+  });
+});
+
+describe("criticalPath", () => {
+  const T = (id, w0, w1, deps = []) => ({ id, w0, w1, deps });
+  it("returns empty when there are no dependencies", () => {
+    const { path } = criticalPath([T("a", 0, 3), T("b", 0, 1)]);
+    expect([...path]).toEqual([]);
+  });
+  it("finds the longest dependency chain by duration, ignoring unconnected tasks", () => {
+    // a(2wk) → b(3wk) → c(1wk)  vs  a → d(1wk); plus isolated x
+    const list = [T("a", 0, 1), T("b", 0, 2, ["a"]), T("c", 0, 0, ["b"]), T("d", 0, 0, ["a"]), T("x", 0, 5)];
+    const { path, ef } = criticalPath(list);
+    expect(ef.a).toBe(2); expect(ef.b).toBe(5); expect(ef.c).toBe(6);
+    expect([...path].sort()).toEqual(["a", "b", "c"]);   // the schedule-driving chain
+    expect(path.has("x")).toBe(false);
+  });
+  it("picks the heavier of two competing chains to the same sink", () => {
+    // long: a(1)→b(1)→sink ; short: c(4)→sink. c's chain finishes later.
+    const list = [T("a", 0, 0), T("b", 0, 0, ["a"]), T("c", 0, 3), T("sink", 0, 0, ["b", "c"])];
+    const { path } = criticalPath(list);
+    expect(path.has("c")).toBe(true);
+    expect(path.has("sink")).toBe(true);
+    expect(path.has("a")).toBe(false);
+  });
+  it("is cycle-safe (does not infinite-loop on a → b → a)", () => {
+    const list = [T("a", 0, 0, ["b"]), T("b", 0, 0, ["a"])];
+    expect(() => criticalPath(list)).not.toThrow();
   });
 });

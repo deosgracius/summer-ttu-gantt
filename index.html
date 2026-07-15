@@ -498,6 +498,13 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .whcell label{font-size:9px; color:var(--mut); font-weight:700; letter-spacing:.02em}
 .whin{width:48px; padding:5px 4px; text-align:center; font-size:12px; border:1px solid var(--line-strong); border-radius:6px; background:var(--panel2); color:var(--txt); font-variant-numeric:tabular-nums}
 .whin:focus{outline:2px solid var(--deo); outline-offset:1px}
+.depspick{max-height:154px; overflow-y:auto; border:1px solid var(--line); border-radius:var(--r-xs); padding:6px 8px; background:var(--panel2); margin-top:5px}
+.depsec{font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--mut); margin:7px 2px 3px}
+.depsec:first-child{margin-top:0}
+.depitem{display:flex; align-items:center; gap:8px; padding:3px 4px; border-radius:6px; cursor:pointer; font-size:13px; color:var(--txt)}
+.depitem:hover{background:color-mix(in srgb,var(--deo) 10%,transparent)}
+.depitem input{width:15px; height:15px; accent-color:var(--deo); flex:none}
+.depsempty{font-size:12px; color:var(--mut); padding:4px}
 .brow.grand{background:linear-gradient(90deg,color-mix(in srgb,var(--deo) 12%,transparent),color-mix(in srgb,var(--can) 12%,transparent))}
 .brow.grand .val{font-size:17px; font-weight:900}
 .brow.oh .nm{color:var(--mut); font-style:italic}
@@ -882,6 +889,7 @@ input:focus-visible,select:focus-visible{outline:none}
         <button class="dimtog on" data-dim="2d" type="button">2D</button>
         <button class="dimtog" data-dim="3d" type="button">3D</button>
       </div>
+      <button class="orgtog deptog" id="orgDeps" type="button" title="Show task dependencies & critical path">⛓ Dependencies</button>
       <button class="orgbtn" id="orgReset" type="button" title="Reset view">↺ Reset</button>
       <span class="orghint">Scroll to zoom · drag to pan · click a node</span>
       <button class="orgbtn" id="orgFull" type="button" title="Toggle full screen">⛶ Full screen</button>
@@ -951,6 +959,8 @@ input:focus-visible,select:focus-visible{outline:none}
   <div class="field"><label>Logged hours by week <span class="sub" id="f_logTotal" style="font-weight:600">0 total</span></label>
     <div id="f_weekhours" class="weekhours"></div>
     <input id="f_log" type="hidden"></div>
+  <div class="field"><label>Depends on <span class="sub" style="font-weight:500">— tasks that must finish first (blocks this one)</span></label>
+    <div id="f_deps" class="depspick"></div></div>
   <div class="seterr" id="tmErr"></div>
   <div class="acts2">
     <button class="btn-save" id="tmSave">Save task</button>
@@ -1719,6 +1729,24 @@ function orgMatch(t){
   if(filterOwner!=="All" && ownerCanon(t.owner)!==filterOwner) return false;
   if(filterText && !((t.name+" "+t.section).toLowerCase().includes(filterText))) return false;
   return true; }
+/* ---- dependencies & critical path ---- */
+let orgDeps=false;
+// longest chain through the dependency DAG (by task duration in weeks) → the critical path
+function criticalPath(list){ list=list||tasks||[];
+  const byId={}; list.forEach(t=>byId[t.id]=t);
+  const dur=t=>Math.max(1,(+t.w1||0)-(+t.w0||0)+1);
+  const ef={}, from={}, seen={};
+  function EF(id){ const t=byId[id]; if(!t) return 0;
+    if(ef[id]!=null) return ef[id];
+    if(seen[id]) return 0; seen[id]=true;   // cycle guard
+    let best=0, bestDep=null;
+    (t.deps||[]).forEach(d=>{ if(!byId[d]) return; const v=EF(d); if(v>best){ best=v; bestDep=d; } });
+    from[id]=bestDep; ef[id]=best+dur(t); return ef[id]; }
+  list.forEach(t=>EF(t.id));
+  let endId=null, mx=-1; list.forEach(t=>{ if(ef[t.id]>mx){ mx=ef[t.id]; endId=t.id; } });
+  const path=new Set(); let cur=endId; while(cur!=null && !path.has(cur)){ path.add(cur); cur=from[cur]; }
+  const hasDeps=list.some(t=>(t.deps||[]).length>0);
+  return {path: hasDeps?path:new Set(), from, ef}; }
 /* ---- 3D "brain" (lazy-loaded WebGL force graph) ---- */
 let org3d=false, org3dGraph=null;
 function cssColor(v){ if(typeof v==="string" && v.trim().startsWith("var(")){ const nm=v.trim().slice(4,-1).trim();
@@ -1741,6 +1769,10 @@ function orgGraphData(){
     sectionsOf(all).forEach((sec,i)=>{ const sid="s:"+i; nodes.push({id:sid,name:sec,color:cssColor("var(--txt2)"),val:5,kind:"section"}); links.push({source:"__c",target:sid,color:cssColor("var(--line-strong)")});
       all.filter(t=>t.section===sec).forEach(t=>{ const c=cssColor(taskStatusColor(t)); nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:c,val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:sid,target:t.id,color:c}); }); });
   }
+  if(orgDeps){ const ids=new Set(nodes.map(n=>n.id)); const {path,from}=criticalPath(all);
+    all.forEach(t=>(t.deps||[]).forEach(d=>{ if(!ids.has(d)||!ids.has(t.id)) return;
+      const cp=path.has(t.id)&&path.has(d)&&from[t.id]===d;
+      links.push({source:d, target:t.id, color: cp?cssColor("var(--deo)"):"#94a3b8", dep:true, cp}); })); }
   return {nodes,links}; }
 function render3D(canvas){
   ensure3D(()=>{
@@ -1748,7 +1780,8 @@ function render3D(canvas){
     if(!org3dGraph){ canvas.innerHTML="";
       org3dGraph=ForceGraph3D()(canvas).backgroundColor("rgba(0,0,0,0)").showNavInfo(false)
         .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeLabel(n=>n.name).nodeOpacity(.95)
-        .linkColor(l=>l.color).linkOpacity(.45).linkWidth(.7)
+        .linkColor(l=>l.color).linkOpacity(.5).linkWidth(l=>l.cp?1.8:(l.dep?0.5:0.7))
+        .linkDirectionalArrowLength(l=>l.dep?3.4:0).linkDirectionalArrowRelPos(1)
         .onNodeClick(n=>{ if(n.tid) openTask(n.tid); }); }
     org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
   }); }
@@ -1757,6 +1790,8 @@ function renderOrgLegend(byOwner){ const el=$("#orglegend"); if(!el) return; con
   let h=dot(sc.done,"Done")+dot(sc.progress,"In progress")+dot(sc.behind,"Behind")+dot(sc.next,"Upcoming");
   h+=`<span class="lgsep">·</span><span class="lg">node = status</span>`;
   if(byOwner) h+=`<span class="lgsep">·</span><span class="lg"><span class="swl"></span>line = member</span>`;
+  if(orgDeps) h+=`<span class="lgsep">·</span><span class="lg"><span class="swl" style="border-top-style:dashed;border-color:#94a3b8"></span>depends on</span>`
+    +`<span class="lg"><span class="swl" style="border-color:var(--deo)"></span>critical path</span>`;
   el.innerHTML=h; el.style.display=""; }
 function renderOrg(){
   const canvas=$("#orgcanvas"); if(!canvas) return;
@@ -1820,10 +1855,20 @@ function renderOrg(){
   nodes.forEach(n=>{ const p=n.r+(n.kind!=="task"?24:5); ext(n.x-p,n.y-p); ext(n.x+p,n.y+p);
     if(n._lab){ ext(n._lab.lx,n._lab.ly); ext(n._lab.fx,n._lab.fy); } });
   const P=44; mnX-=P; mnY-=P; mxX+=P; mxY+=P;
-  let svg=`<svg viewBox="${mnX.toFixed(0)} ${mnY.toFixed(0)} ${(mxX-mnX).toFixed(0)} ${(mxY-mnY).toFixed(0)}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Project organization graph"><g id="orgpan" transform="translate(${orgPanX},${orgPanY}) scale(${orgZoom})">`;
+  let svg=`<svg viewBox="${mnX.toFixed(0)} ${mnY.toFixed(0)} ${(mxX-mnX).toFixed(0)} ${(mxY-mnY).toFixed(0)}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Project organization graph"><defs><marker id="deparrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker><marker id="cparrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--deo)"/></marker></defs><g id="orgpan" transform="translate(${orgPanX},${orgPanY}) scale(${orgZoom})">`;
   edges.forEach(e=>{ const a=byId[e.a], b=byId[e.b]; if(!a||!b) return;
     const t=byId[e.b]; const faded=(t.kind==="task" && !orgMatch(t.task));
     svg+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${e.color}" stroke-opacity="${faded?0.08:0.55}" style="stroke-width:${e.w}"/>`; });
+  // dependency overlay (dashed) + critical path (solid accent)
+  if(orgDeps){ const {path:cpPath, from:cpFrom}=criticalPath(all);
+    all.forEach(t=>{ (t.deps||[]).forEach(d=>{ const a=byId["t"+d], b=byId["t"+t.id]; if(!a||!b) return;
+      const onCP=cpPath.has(t.id)&&cpPath.has(d)&&cpFrom[t.id]===d;
+      const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
+      const ax=(a.x+ux*(a.r+2)).toFixed(1), ay=(a.y+uy*(a.r+2)).toFixed(1);
+      const bx=(b.x-ux*(b.r+4)).toFixed(1), by=(b.y-uy*(b.r+4)).toFixed(1);
+      const faded=(!orgMatch(a.task)||!orgMatch(b.task));
+      svg+=`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${onCP?'var(--deo)':'#94a3b8'}" stroke-opacity="${faded?0.06:(onCP?0.95:0.42)}" stroke-dasharray="${onCP?'':'4 3'}" style="stroke-width:${onCP?2.4:1.1}" marker-end="url(#${onCP?'cparrow':'deparrow'})"/>`;
+    }); }); }
   nodes.forEach(n=>{
     const dim=(n.kind==="task" && !orgMatch(n.task))?" dim":"";
     svg+=`<g class="onode${dim}"${n.kind==="task"?` data-oid="${n.task.id}"`:""}>`;
@@ -1854,6 +1899,8 @@ function bindOrgPanZoom(canvas){
 }
 document.querySelectorAll(".orgtog").forEach(b=>b.onclick=()=>{ orgColorBy=b.dataset.org; localStorage.setItem("eh_orgcolor",orgColorBy);
   document.querySelectorAll(".orgtog").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
+{ const db=$("#orgDeps"); if(db) db.onclick=()=>{ orgDeps=!orgDeps; db.classList.toggle("on",orgDeps);
+    if(org3d && org3dGraph) org3dGraph.graphData(orgGraphData()); else renderOrg(); }; }
 { const rb=$("#orgReset"); if(rb) rb.onclick=()=>{ orgZoom=1; orgPanX=0; orgPanY=0; renderOrg(); }; }
 function orgToggleFull(){ const w=$("#orgview"); const on=w.classList.toggle("full");
   const b=$("#orgFull"); if(b) b.textContent = on?"⛶ Exit full screen":"⛶ Full screen";
@@ -1917,6 +1964,21 @@ function fhUpdate(){
 $("#f_w0").addEventListener("change",renderWeekHours);
 $("#f_w1").addEventListener("change",renderWeekHours);
 
+// ids of tasks that (transitively) depend on `id` — used to block cycle-creating choices
+function taskDependents(id){ const out=new Set(); let changed=true;
+  while(changed){ changed=false;
+    (tasks||[]).forEach(t=>{ if(out.has(t.id)) return; const d=t.deps||[];
+      if(d.includes(id) || d.some(x=>out.has(x))){ out.add(t.id); changed=true; } }); }
+  return out; }
+function renderDepsPicker(t){ const box=$("#f_deps"); if(!box) return;
+  const self=t?t.id:null, blocked=self?taskDependents(self):new Set(), cur=new Set((t&&t.deps)||[]);
+  const elig=(tasks||[]).filter(x=>x.id!==self && !blocked.has(x.id));
+  if(!elig.length){ box.innerHTML=`<div class="depsempty">No other tasks to depend on yet.</div>`; return; }
+  let h=""; [...new Set(elig.map(x=>x.section))].forEach(sec=>{
+    h+=`<div class="depsec">${esc(sec)}</div>`;
+    elig.filter(x=>x.section===sec).forEach(x=>{ const on=cur.has(x.id);
+      h+=`<label class="depitem"><input type="checkbox" value="${x.id}"${on?" checked":""}><span>${esc(x.name)}</span></label>`; }); });
+  box.innerHTML=h; }
 function openTask(id){
   modalOpen=true; editingId=id; $("#tmErr").textContent="";
   const t = id? tasks.find(x=>x.id===id) : null;
@@ -1927,7 +1989,7 @@ function openTask(id){
   buildOwnerSeg(t?t.owner:null); setOwnerSeg(defOwner);
   $("#f_w0").value=t?t.w0:cfg.now_week; $("#f_w1").value=t?t.w1:cfg.now_week;
   $("#f_comp").value=t?t.comp:0; $("#f_compVal").textContent=(t?t.comp:0)+"%";
-  $("#f_est").value=t?t.est_hours:""; fhInit(t);
+  $("#f_est").value=t?t.est_hours:""; fhInit(t); renderDepsPicker(t);
   $("#taskModal").classList.add("show");
 }
 function closeTask(){modalOpen=false;editingId=null;$("#taskModal").classList.remove("show");}
@@ -1941,8 +2003,9 @@ $("#tmSave").onclick=async()=>{
   const t=tasks.find(x=>x.id===editingId);
   const hbw={}; $("#f_weekhours").querySelectorAll(".whin").forEach(inp=>{ const v=+inp.value||0; if(v) hbw[inp.dataset.wk]=v; });
   const loggedSum=Object.values(hbw).reduce((s,v)=>s+(+v||0),0);
+  const deps=[...$("#f_deps").querySelectorAll("input:checked")].map(i=>i.value);
   const rec={ id: editingId||"", section:($("#f_section").value||"General").trim(), name, owner:chosenOwner,
-    comp:+$("#f_comp").value, w0, w1, est_hours:+$("#f_est").value||0, logged_hours:loggedSum, hours_by_week:hbw,
+    comp:+$("#f_comp").value, w0, w1, est_hours:+$("#f_est").value||0, logged_hours:loggedSum, hours_by_week:hbw, deps,
     sort_order: t? t.sort_order : (Math.max(0,...tasks.map(x=>x.sort_order))+1) };
   if(t && t.updated_at) rec.updated_at = t.updated_at;   // optimistic-concurrency token
   const prevComp = t? (+t.comp||0) : 0;

@@ -132,6 +132,33 @@ export function dueSoonTasks(tasks, nowWeek) { return (tasks || []).filter(t => 
 /** Count of started-but-unfinished tasks. */
 export function inProgressCount(tasks) { return (tasks || []).filter(t => { const c = +t.comp || 0; return c > 0 && c < 100; }).length; }
 
+/**
+ * Critical path through the task dependency DAG.
+ * Each task has `deps` = ids of tasks that must finish first. "Cost" is a task's
+ * duration in weeks (w1-w0+1, min 1). Returns the set of task ids on the longest
+ * dependency chain (the schedule-driving path), plus earliest-finish per task.
+ * Empty path when no dependencies exist. Cycle-safe.
+ */
+export function criticalPath(list) {
+  list = list || [];
+  const byId = {}; list.forEach(t => { byId[t.id] = t; });
+  const dur = t => Math.max(1, (+t.w1 || 0) - (+t.w0 || 0) + 1);
+  const ef = {}, from = {}, seen = {};
+  function EF(id) {
+    const t = byId[id]; if (!t) return 0;
+    if (ef[id] != null) return ef[id];
+    if (seen[id]) return 0; seen[id] = true;           // cycle guard
+    let best = 0, bestDep = null;
+    (t.deps || []).forEach(d => { if (!byId[d]) return; const v = EF(d); if (v > best) { best = v; bestDep = d; } });
+    from[id] = bestDep; ef[id] = best + dur(t); return ef[id];
+  }
+  list.forEach(t => EF(t.id));
+  let endId = null, mx = -1; list.forEach(t => { if (ef[t.id] > mx) { mx = ef[t.id]; endId = t.id; } });
+  const path = new Set(); let cur = endId; while (cur != null && !path.has(cur)) { path.add(cur); cur = from[cur]; }
+  const hasDeps = list.some(t => (t.deps || []).length > 0);
+  return { path: hasDeps ? path : new Set(), from, ef };
+}
+
 /** Command-palette fuzzy score: substring > subsequence > no match. */
 export function cmdkFuzzy(hay, q) {
   hay = hay.toLowerCase(); if (!q) return 1;
