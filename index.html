@@ -268,8 +268,8 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 /* ===== Organization (graph) view ===== */
 .orgwrap{border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--panel); box-shadow:var(--card-shadow); position:relative}
 .orgbar{display:flex; align-items:center; gap:14px; padding:10px 14px; border-bottom:1px solid var(--line)}
-.orgtog{padding:6px 12px; border-radius:7px; font-size:12px; font-weight:600; background:transparent; color:var(--mut); border:0; cursor:pointer}
-.orgtog.on{background:color-mix(in srgb,var(--deo) 13%,var(--panel-solid)); color:var(--txt); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 42%,var(--line-strong))}
+.orgtog,.dimtog{padding:6px 12px; border-radius:7px; font-size:12px; font-weight:600; background:transparent; color:var(--mut); border:0; cursor:pointer}
+.orgtog.on,.dimtog.on{background:color-mix(in srgb,var(--deo) 13%,var(--panel-solid)); color:var(--txt); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 42%,var(--line-strong))}
 .orghint{margin-left:auto; font-size:11px; color:var(--faint)}
 .orgbtn{padding:6px 11px; border-radius:8px; font-size:12px; font-weight:600; background:var(--panel2); border:1px solid var(--line); color:var(--txt2); cursor:pointer}
 .orgbtn:hover{color:var(--txt); border-color:var(--line-strong)}
@@ -863,6 +863,10 @@ input:focus-visible,select:focus-visible{outline:none}
       <div class="vtoggle" style="margin:0">
         <button class="orgtog on" data-org="status" type="button">By status</button>
         <button class="orgtog" data-org="owner" type="button">By owner</button>
+      </div>
+      <div class="vtoggle" style="margin:0">
+        <button class="dimtog on" data-dim="2d" type="button">2D</button>
+        <button class="dimtog" data-dim="3d" type="button">3D</button>
       </div>
       <button class="orgbtn" id="orgReset" type="button" title="Reset view">↺ Reset</button>
       <span class="orghint">Scroll to zoom · drag to pan · click a node</span>
@@ -1684,6 +1688,7 @@ function setTimelineView(v){ timelineView=v; localStorage.setItem("eh_tlview",v)
   const org=(v==="org");
   const gw=$(".gwrap"); if(gw) gw.style.display=org?"none":"";
   const ov=$("#orgview"); if(ov) ov.style.display=org?"":"none";
+  if(!org) teardown3D();
   renderLegend(); if(org) renderOrg(); else renderGrid(); }
 document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>setTimelineView(b.dataset.tl));
 
@@ -1699,8 +1704,43 @@ function orgMatch(t){
   if(filterOwner!=="All" && ownerCanon(t.owner)!==filterOwner) return false;
   if(filterText && !((t.name+" "+t.section).toLowerCase().includes(filterText))) return false;
   return true; }
+/* ---- 3D "brain" (lazy-loaded WebGL force graph) ---- */
+let org3d=false, org3dGraph=null;
+function cssColor(v){ if(typeof v==="string" && v.trim().startsWith("var(")){ const nm=v.trim().slice(4,-1).trim();
+  return getComputedStyle(document.documentElement).getPropertyValue(nm).trim() || "#8891a0"; } return v; }
+function teardown3D(){ if(org3dGraph){ try{ org3dGraph._destructor&&org3dGraph._destructor(); }catch(e){} org3dGraph=null; } }
+function ensure3D(cb){ if(window.ForceGraph3D) return cb();
+  if(window.__l3d){ window.__l3d.push(cb); return; } window.__l3d=[cb];
+  const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.4/dist/3d-force-graph.min.js";
+  s.onload=()=>{ (window.__l3d||[]).forEach(f=>f()); window.__l3d=null; };
+  s.onerror=()=>{ window.__l3d=null; toast("Couldn't load the 3D view (network)."); org3d=false;
+    document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); };
+  document.head.appendChild(s); }
+function orgGraphData(){
+  const all=tasks||[], byOwner=(orgColorBy==="owner");
+  const nodes=[{id:"__c",name:(cfg.project_name||cfg.title||"Project"),color:cssColor("var(--deo)"),val:10,kind:"center"}], links=[];
+  if(byOwner){
+    ownerList().forEach(o=>{ const oc=cssColor(ownerColor(o)); nodes.push({id:"o:"+o,name:o,color:oc,val:6,kind:"owner"}); links.push({source:"__c",target:"o:"+o,color:oc});
+      all.filter(t=>ownerCanon(t.owner)===o).forEach(t=>{ nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:oc,val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:"o:"+o,target:t.id,color:oc}); }); });
+  } else {
+    sectionsOf(all).forEach((sec,i)=>{ const sid="s:"+i; nodes.push({id:sid,name:sec,color:cssColor("var(--txt2)"),val:5,kind:"section"}); links.push({source:"__c",target:sid,color:cssColor("var(--line-strong)")});
+      all.filter(t=>t.section===sec).forEach(t=>{ const c=cssColor(taskStatusColor(t)); nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:c,val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:sid,target:t.id,color:c}); }); });
+  }
+  return {nodes,links}; }
+function render3D(canvas){
+  ensure3D(()=>{
+    if(!org3d) return;
+    if(!org3dGraph){ canvas.innerHTML="";
+      org3dGraph=ForceGraph3D()(canvas).backgroundColor("rgba(0,0,0,0)").showNavInfo(false)
+        .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeLabel(n=>n.name).nodeOpacity(.95)
+        .linkColor(l=>l.color).linkOpacity(.45).linkWidth(.7)
+        .onNodeClick(n=>{ if(n.tid) openTask(n.tid); }); }
+    org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
+  }); }
 function renderOrg(){
   const canvas=$("#orgcanvas"); if(!canvas) return;
+  if(org3d){ render3D(canvas); return; }
+  teardown3D(); if(canvas.querySelector("canvas")) canvas.innerHTML="";
   const all=tasks||[];
   const byOwner=(orgColorBy==="owner");
   const nodes=[], edges=[], byId={};
@@ -1783,6 +1823,8 @@ function orgToggleFull(){ const w=$("#orgview"); const on=w.classList.toggle("fu
   const b=$("#orgFull"); if(b) b.textContent = on?"⛶ Exit full screen":"⛶ Full screen";
   setTimeout(renderOrg,30); }
 { const fb=$("#orgFull"); if(fb) fb.onclick=orgToggleFull; }
+document.querySelectorAll(".dimtog").forEach(b=>b.onclick=()=>{ org3d=(b.dataset.dim==="3d");
+  document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
 function renderTimeline(){ if(timelineView==="org") renderOrg(); else renderGrid(); }
 
 /* ====================== RENDER ALL ====================== */
