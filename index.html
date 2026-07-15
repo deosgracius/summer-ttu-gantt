@@ -265,6 +265,22 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .orow .ob{flex:1; height:8px; border-radius:99px; background:var(--panel2); overflow:hidden; border:1px solid var(--line)}
 .orow .ob i{display:block;height:100%;border-radius:99px; transition:width .6s}
 .orow .pc{width:34px; text-align:right; color:var(--mut); font-weight:700; font-size:11px}
+/* ===== Organization (graph) view ===== */
+.orgwrap{border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--panel); box-shadow:var(--card-shadow); position:relative}
+.orgbar{display:flex; align-items:center; gap:14px; padding:10px 14px; border-bottom:1px solid var(--line)}
+.orgtog{padding:6px 12px; border-radius:7px; font-size:12px; font-weight:600; background:transparent; color:var(--mut); border:0; cursor:pointer}
+.orgtog.on{background:color-mix(in srgb,var(--deo) 13%,var(--panel-solid)); color:var(--txt); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 42%,var(--line-strong))}
+.orghint{margin-left:auto; font-size:11px; color:var(--faint)}
+.orgcanvas{height:min(72vh,640px); overflow:hidden; cursor:grab; background:radial-gradient(circle at 50% 44%, color-mix(in srgb,var(--deo) 6%,transparent), transparent 62%)}
+.orgcanvas:active{cursor:grabbing}
+.orgcanvas svg{width:100%; height:100%; display:block; user-select:none}
+.oedge{stroke:var(--line-strong); stroke-opacity:.55}
+.onode{cursor:pointer}
+.onode circle{transition:stroke-width .12s}
+.onode:hover circle{stroke:var(--txt); stroke-width:2.5}
+.onode.dim{opacity:.16}
+.ocenter-label{fill:var(--txt); font-weight:800; font-size:13px}
+.osec-label{fill:var(--txt2); font-weight:700; font-size:11px}
 
 /* ============ CONTROLS ============ */
 .controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px}
@@ -824,6 +840,7 @@ input:focus-visible,select:focus-visible{outline:none}
     <div class="vtoggle">
       <button class="vtab" data-tl="detailed" type="button">Detailed</button>
       <button class="vtab" data-tl="progress" type="button">Progress</button>
+      <button class="vtab" data-tl="org" type="button">Organization</button>
     </div>
     <div class="search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="search" placeholder="Search tasks…"></div>
@@ -835,6 +852,17 @@ input:focus-visible,select:focus-visible{outline:none}
   <div class="gwrap"><div class="grid" id="grid"><div class="skel"></div></div>
     <div class="hovlayer" id="hov"></div>
     <div class="nowcol" id="nowcol"><span class="nowtag">NOW</span></div>
+  </div>
+
+  <div class="orgwrap" id="orgview" style="display:none">
+    <div class="orgbar">
+      <div class="vtoggle" style="margin:0">
+        <button class="orgtog on" data-org="status" type="button">By status</button>
+        <button class="orgtog" data-org="owner" type="button">By owner</button>
+      </div>
+      <span class="orghint">Scroll to zoom · drag to pan · click a node to open it</span>
+    </div>
+    <div class="orgcanvas" id="orgcanvas"></div>
   </div>
   </div><!-- /viewTimeline -->
 
@@ -1489,7 +1517,7 @@ function renderChips(){
   $("#ownerChips").innerHTML = defs.map(([k,lab,col])=>`
     <button class="chip ${filterOwner===k?'active':''}" data-o="${esc(k)}" ${filterOwner===k?'style="background:var(--primary)"':''}>
       ${col?`<span class="d" style="background:${col}"></span>`:""}${esc(lab)} <span style="opacity:.6">${k==="All"?tasks.length:count(k)}</span></button>`).join("");
-  document.querySelectorAll("#ownerChips .chip").forEach(c=>c.onclick=()=>{filterOwner=c.dataset.o; renderChips(); renderGrid();});
+  document.querySelectorAll("#ownerChips .chip").forEach(c=>c.onclick=()=>{filterOwner=c.dataset.o; renderChips(); renderTimeline();});
 }
 
 /* ====================== RENDER: GANTT ====================== */
@@ -1647,11 +1675,87 @@ function renderLegend(){
 }
 function setTimelineView(v){ timelineView=v; localStorage.setItem("eh_tlview",v);
   document.querySelectorAll(".vtab").forEach(b=>b.classList.toggle("active",b.dataset.tl===v));
-  renderLegend(); renderGrid(); }
+  const org=(v==="org");
+  const gw=$(".gwrap"); if(gw) gw.style.display=org?"none":"";
+  const ov=$("#orgview"); if(ov) ov.style.display=org?"":"none";
+  renderLegend(); if(org) renderOrg(); else renderGrid(); }
 document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>setTimelineView(b.dataset.tl));
 
+/* ====================== ORGANIZATION (graph) VIEW ====================== */
+let orgColorBy = localStorage.getItem("eh_orgcolor") || "status";
+let orgZoom = 1, orgPanX = 0, orgPanY = 0;
+function taskStatusColor(t){ const sc=statusColors(); const c=+t.comp||0;
+  if(c>=100) return sc.done;
+  if(t.w1 < cfg.now_week) return sc.behind;
+  if(t.w0<=cfg.now_week && cfg.now_week<=t.w1) return sc.progress;
+  return sc.next; }
+function orgMatch(t){
+  if(filterOwner!=="All" && ownerCanon(t.owner)!==filterOwner) return false;
+  if(filterText && !((t.name+" "+t.section).toLowerCase().includes(filterText))) return false;
+  return true; }
+function renderOrg(){
+  const canvas=$("#orgcanvas"); if(!canvas) return;
+  const all=tasks||[]; const secs=sectionsOf(all);
+  const W=1100, H=680, cx=W/2, cy=H/2;
+  const nodes=[], edges=[], byId={};
+  nodes.push({id:"__c", kind:"center", x:cx, y:cy, r:30, label:(cfg.project_name||cfg.title||"Project")});
+  const R1=Math.min(W,H)*0.32, nSec=Math.max(1,secs.length);
+  secs.forEach((sec,i)=>{
+    const ang=(i/nSec)*Math.PI*2 - Math.PI/2;
+    const sx=cx+Math.cos(ang)*R1, sy=cy+Math.sin(ang)*R1, sid="s"+i;
+    const items=all.filter(t=>t.section===sec), n=items.length;
+    nodes.push({id:sid, kind:"section", x:sx, y:sy, r:16, label:sec});
+    edges.push(["__c",sid,2.2]);
+    const spread=Math.min(Math.PI*1.15, 0.5 + n*0.14), R2=72 + Math.min(96, n*5);
+    items.forEach((t,j)=>{
+      const a2=ang + (n>1 ? (j/(n-1)-0.5)*spread : 0), rr=R2 + ((j%2)?16:0);
+      nodes.push({id:"t"+t.id, kind:"task", x:sx+Math.cos(a2)*rr, y:sy+Math.sin(a2)*rr, r:5+Math.round((+t.comp||0)/100*5), task:t});
+      edges.push([sid,"t"+t.id,1]);
+    });
+  });
+  nodes.forEach(n=>byId[n.id]=n);
+  const col=n=> n.kind==="center" ? "var(--deo)" : n.kind==="section" ? "var(--txt2)"
+              : (orgColorBy==="owner" ? ownerColor(n.task.owner) : taskStatusColor(n.task));
+  let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Project organization graph"><g id="orgpan" transform="translate(${orgPanX},${orgPanY}) scale(${orgZoom})">`;
+  edges.forEach(e=>{ const a=byId[e[0]], b=byId[e[1]]; if(!a||!b) return;
+    svg+=`<line class="oedge" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" style="stroke-width:${e[2]}"/>`; });
+  nodes.forEach(n=>{
+    const dim = (n.kind==="task" && !orgMatch(n.task)) ? " dim" : "";
+    svg+=`<g class="onode${dim}"${n.kind==="task"?` data-oid="${n.task.id}"`:""}>`;
+    svg+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.r}" fill="${col(n)}" stroke="var(--panel-solid)" stroke-width="1.5"/>`;
+    if(n.kind==="center") svg+=`<text class="ocenter-label" x="${n.x}" y="${(n.y+n.r+16).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
+    else if(n.kind==="section") svg+=`<text class="osec-label" x="${n.x}" y="${(n.y-n.r-7).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
+    svg+=`</g>`;
+  });
+  svg+=`</g></svg>`;
+  canvas.innerHTML=svg;
+  canvas.querySelectorAll(".onode[data-oid]").forEach(el=>{
+    el.addEventListener("click",()=>openTask(el.dataset.oid));
+    el.addEventListener("mousemove",ev=>showBarTip(el.dataset.oid, ev));
+    el.addEventListener("mouseleave",hideTip);
+  });
+  bindOrgPanZoom(canvas);
+}
+function applyOrgTransform(g){ if(g) g.setAttribute("transform",`translate(${orgPanX},${orgPanY}) scale(${orgZoom})`); }
+function bindOrgPanZoom(canvas){
+  const g=canvas.querySelector("#orgpan");
+  canvas.onwheel=e=>{ e.preventDefault(); orgZoom=Math.max(0.4,Math.min(3, orgZoom*(e.deltaY<0?1.12:0.9))); applyOrgTransform(g); };
+  canvas.onmousedown=e=>{ if(e.target.closest(".onode[data-oid]")) return; const sx=e.clientX, sy=e.clientY, px=orgPanX, py=orgPanY;
+    const mv=ev=>{ orgPanX=px+(ev.clientX-sx); orgPanY=py+(ev.clientY-sy); applyOrgTransform(g); };
+    const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
+    document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
+}
+document.querySelectorAll(".orgtog").forEach(b=>b.onclick=()=>{ orgColorBy=b.dataset.org; localStorage.setItem("eh_orgcolor",orgColorBy);
+  document.querySelectorAll(".orgtog").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
+function renderTimeline(){ if(timelineView==="org") renderOrg(); else renderGrid(); }
+
 /* ====================== RENDER ALL ====================== */
-function renderAll(){ renderDash(); renderChips(); renderLegend(); renderGrid(); fillWeekSelects(); fillSecList(); renderBudget();
+function renderAll(){ renderDash(); renderChips(); renderLegend();
+  const org=(timelineView==="org");
+  const gw=$(".gwrap"); if(gw) gw.style.display=org?"none":"";
+  const ov=$("#orgview"); if(ov) ov.style.display=org?"":"none";
+  if(org) renderOrg(); else renderGrid();
+  fillWeekSelects(); fillSecList(); renderBudget();
   document.querySelectorAll(".vtab").forEach(b=>b.classList.toggle("active",b.dataset.tl===timelineView)); }
 
 /* ====================== TASK MODAL ====================== */
@@ -1847,7 +1951,7 @@ $("#editBtn").onclick=()=>{editMode=!editMode;const b=$("#editBtn");b.classList.
   renderGrid(); renderBudget();};
 $("#addBtn").onclick=()=>openTask(null);
 $("#logoutBtn").onclick=()=>doLogout();
-$("#search").addEventListener("input",e=>{filterText=e.target.value.toLowerCase().trim();renderGrid();});
+$("#search").addEventListener("input",e=>{filterText=e.target.value.toLowerCase().trim();renderTimeline();});
 
 /* ====================== THEME ====================== */
 function setTheme(t){document.documentElement.setAttribute("data-theme",t);localStorage.setItem("eh_theme",t);
