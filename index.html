@@ -1862,17 +1862,31 @@ function ensure3D(cb){ if(window.ForceGraph3D) return cb();
     (window.__l3d||[]).forEach(f=>f()); window.__l3d=null;
   }catch(e){ window.__l3d=null; toast("Couldn't load the 3D view (network)."); org3d=false;
     document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); } })(); }
-/* always-on 3D node label (department/member/task name), like the Campus Assistant brain */
+/* initials-badge avatar sprite (colored disc + white initials) */
+function avatar3DSprite(text,color,size){
+  const cvs=document.createElement("canvas"); cvs.width=cvs.height=128; const c=cvs.getContext("2d");
+  c.beginPath(); c.arc(64,64,58,0,Math.PI*2); c.fillStyle=color||"#888"; c.fill();
+  c.lineWidth=7; c.strokeStyle="rgba(255,255,255,.9)"; c.stroke();
+  c.fillStyle="#fff"; c.font="bold "+((text&&text.length>1)?52:62)+"px system-ui,-apple-system,sans-serif";
+  c.textAlign="center"; c.textBaseline="middle"; c.fillText(text||"", 64, 71);
+  const tex=new THREE.CanvasTexture(cvs); tex.anisotropy=4;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false}));
+  sp.scale.set(size,size,1); return sp; }
+/* always-on 3D node = name label (+ initials avatar), theme-aware, like the Campus Assistant brain */
 function node3DObject(n){ if(!window.SpriteText) return null;
+  const grp=new THREE.Group();
+  const lblCol=cssColor("var(--txt)")||"#e5e7eb", halo=cssColor("var(--panel-solid)")||"#0b1020";
   const s=new SpriteText(n.name||"");
-  s.color = n.color || "#e5e7eb";
-  s.textHeight = n.kind==="center"?7 : n.kind==="owner"?5.5 : n.kind==="section"?4 : 3;
-  s.fontWeight = (n.kind==="task")?"500":"700";
-  s.backgroundColor = false; s.padding = 0;
-  s.strokeColor = "#0b1020"; s.strokeWidth = 0.6;
-  s.position.set(0, (n.kind==="center"?12 : n.kind==="owner"?10 : n.kind==="section"?7.5 : 5.5), 0);
-  s.material.depthWrite = false;
-  return s; }
+  s.color=lblCol; s.textHeight = n.kind==="center"?7 : n.kind==="owner"?5.2 : n.kind==="section"?3.8 : 2.8;
+  s.fontWeight=(n.kind==="task")?"500":"700"; s.backgroundColor=false; s.padding=0;
+  s.strokeColor=halo; s.strokeWidth=0.9; s.material.depthWrite=false;
+  s.position.set(0, (n.kind==="center"?13 : n.kind==="owner"?12 : n.kind==="section"?7.5 : 6.5), 0);
+  grp.add(s);
+  if(n.av){
+    if(n.kind==="owner"){ grp.add(avatar3DSprite(n.av, n.avColor||n.color, 14)); }              // member = avatar disc
+    else if(n.kind==="task"){ const av=avatar3DSprite(n.av, n.avColor||n.color, 5); av.position.set(3.6,3.6,1); grp.add(av); } // small owner badge on the task
+  }
+  return grp; }
 /* ---- hierarchy + progressive disclosure (collapse/expand) — shared by 2D & 3D ---- */
 let orgExpanded = new Set();   // ids of nodes the user has opened; the centre is always open
 function orgTree(){
@@ -1918,6 +1932,18 @@ function orgNodeFill(n){ return n.kind==="center"?"var(--deo)"
 function orgEdgeColor(parent,child){ return child.kind==="task"? taskStatusColor(child.task)
   : ((child.kind==="owner"||child.kind==="section") && orgColorBy==="owner")? ownerColor(child.owner||parent.owner)
   : "var(--line-strong)"; }
+// fixed radial positions (same tidy layout as 2D) so the 3D brain sits in clean rings, not a scattered cloud
+function orgLayoutPositions(){
+  const root=orgTree(), RING=[0,250,505,760], S=0.17;
+  const rad=d=> (d<RING.length?RING[d]:RING[RING.length-1]+(d-RING.length+1)*245)*S;
+  const leaves=node=>{ const c=orgVisKids(node); if(!c.length) return 1; return c.reduce((s,ch)=>s+leaves(ch),0); };
+  const pos={};
+  (function place(node,depth,a0,a1){ const ang=(a0+a1)/2 - Math.PI/2, r=rad(depth);
+    pos[node.id]={x:Math.cos(ang)*r, y:Math.sin(ang)*r};
+    const c=orgVisKids(node); if(!c.length) return;
+    const tot=c.reduce((s,ch)=>s+leaves(ch),0)||1; let a=a0;
+    c.forEach(ch=>{ const span=(a1-a0)*leaves(ch)/tot; place(ch,depth+1,a,a+span); a+=span; }); })(root,0,0,Math.PI*2);
+  return pos; }
 function orgGraphData(){
   const root=orgTree(); const nodes=[], links=[]; const visTask=new Set();
   (function walk(node){
@@ -1926,7 +1952,9 @@ function orgGraphData(){
            : (node.label + (orgHasKids(node)&&!orgIsOpen(node)? "  (+"+node.children.length+")":"")),
       color: (node.kind==="task" && !orgTaskShown(node.task))? "#3a3f4a" : cssColor(orgNodeFill(node)),
       val: node.kind==="center"?10:node.kind==="owner"?6:node.kind==="section"?4.5:2+(+node.task.comp||0)/40,
-      tid: node.kind==="task"? node.task.id : null, hasKids: orgHasKids(node) });
+      tid: node.kind==="task"? node.task.id : null, hasKids: orgHasKids(node),
+      av: node.kind==="owner"? initials(node.label) : node.kind==="task"? initials(ownerCanon(node.task.owner)) : null,
+      avColor: node.kind==="owner"? cssColor(ownerColor(node.label)) : node.kind==="task"? cssColor(ownerColor(node.task.owner)) : null });
     if(node.kind==="task") visTask.add(node.task.id);
     orgVisKids(node).forEach(ch=>{ links.push({source:node.id, target:ch.id, color: cssColor(orgEdgeColor(node,ch))}); walk(ch); });
   })(root);
@@ -1934,6 +1962,9 @@ function orgGraphData(){
     (tasks||[]).forEach(t=>(t.deps||[]).forEach(d=>{ if(!visTask.has(t.id)||!visTask.has(d)) return;
       const cp=path.has(t.id)&&path.has(d)&&from[t.id]===d;
       links.push({source:"t"+d, target:"t"+t.id, color: cp?cssColor("var(--deo)"):"#94a3b8", dep:true, cp}); })); }
+  // pin every node to its radial slot (flat disc you can rotate) — organized like the Summer brain
+  const pos=orgLayoutPositions();
+  nodes.forEach(nd=>{ const p=pos[nd.id]; if(p){ nd.fx=p.x; nd.fy=p.y; nd.fz=0; } });
   return {nodes,links}; }
 function render3D(canvas){
   ensure3D(()=>{
@@ -1946,8 +1977,10 @@ function render3D(canvas){
         .linkDirectionalArrowLength(l=>l.dep?3.4:0).linkDirectionalArrowRelPos(1)
         .onNodeClick(n=>{ if(n.kind==="task"){ if(n.tid) openTaskDrawer(n.tid); }
           else if(n.hasKids){ orgToggle(n.nid); org3dGraph.graphData(orgGraphData()); } });
-      if(window.SpriteText) org3dGraph.nodeThreeObjectExtend(true).nodeThreeObject(node3DObject); }
+      if(window.SpriteText) org3dGraph.nodeThreeObjectExtend(true).nodeThreeObject(node3DObject);
+      org3dGraph.__fit=false; }
     org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
+    if(!org3dGraph.__fit){ org3dGraph.__fit=true; setTimeout(()=>{ try{ org3dGraph.zoomToFit(600,60); }catch(e){} }, 450); }
   }); }
 function orgExpandAll(){ orgExpanded.clear(); (function w(n){ if(orgHasKids(n)&&n.kind!=="center") orgExpanded.add(n.id); (n.children||[]).forEach(w); })(orgTree()); }
 function orgCollapseAll(){ orgExpanded.clear(); }
@@ -2424,7 +2457,9 @@ function setTheme(t){document.documentElement.setAttribute("data-theme",t);local
     ? '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Light'
     : '<svg viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Dark';
   $("#themeBtn").innerHTML = html; const at=$("#adminThemeBtn"); if(at) at.innerHTML = html;
-  if(typeof placeOverlay==="function"&&$("#grid").children.length)placeOverlay();}
+  if(typeof placeOverlay==="function"&&$("#grid").children.length)placeOverlay();
+  // 3D labels/avatars bake theme colours at build time — rebuild so they follow the new theme
+  if(typeof org3d!=="undefined" && org3d && typeof teardown3D==="function"){ teardown3D(); if(typeof renderOrg==="function") renderOrg(); } }
 $("#themeBtn").onclick=()=>setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
 setTheme(localStorage.getItem("eh_theme")||"dark");
 
