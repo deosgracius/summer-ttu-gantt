@@ -17,6 +17,7 @@
   --font:"Geist","Inter",system-ui,-apple-system,sans-serif;
   --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --maxw:1240px;
+  --top-glow:none;
   --accent-grad:linear-gradient(180deg,color-mix(in srgb,var(--deo) 82%,#fff),var(--deo));
   /* motion system — consistent, smooth easing everywhere */
   --ease:cubic-bezier(.4,0,.2,1);
@@ -26,7 +27,8 @@
   --ring:0 0 0 3px color-mix(in srgb,var(--deo) 32%,transparent);
 }
 [data-theme="dark"]{
-  --bg:#0a0a0c; --bg2:#101015;
+  --bg:oklch(0.15 0.028 262); --bg2:oklch(0.135 0.028 262);
+  --top-glow:radial-gradient(1100px 650px at 50% -12%, oklch(0.32 0.08 255 / 0.5), transparent 60%);
   --panel:#18181c; --panel-solid:#18181c; --panel2:rgba(255,255,255,.05);
   --line:rgba(255,255,255,.095); --line-strong:rgba(255,255,255,.17);
   --txt:#f6f7f9; --txt2:#cfd2da; --mut:#b6bac4; --faint:#767982;
@@ -59,6 +61,7 @@
 html,body{margin:0;padding:0}
 body{
   background:
+    var(--top-glow),
     radial-gradient(var(--dot) 1px, transparent 1.4px) 0 0 / 26px 26px,
     linear-gradient(180deg,var(--bg),var(--bg2));
   background-attachment:fixed;
@@ -75,6 +78,8 @@ body::before{content:""; position:fixed; inset:-25%; z-index:-1; pointer-events:
   filter:saturate(1.05); animation:auroraDrift 30s var(--ease) infinite alternate;}
 @keyframes auroraDrift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(-3%,2.5%,0) scale(1.07)}100%{transform:translate3d(2.5%,-2%,0) scale(1.04)}}
 @media (prefers-reduced-motion:reduce){body::before{animation:none}}
+/* dark theme mirrors the Campus Assistant: flat navy base + a single static top glow (no drifting aurora) */
+[data-theme="dark"] body::before{display:none}
 .mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
 .wrap{max-width:var(--maxw); margin:0 auto; padding:22px clamp(14px,3.2vw,40px) 70px}
 button{font-family:var(--font); cursor:pointer; border:0}
