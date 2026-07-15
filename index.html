@@ -1851,13 +1851,28 @@ let org3d=false, org3dGraph=null;
 function cssColor(v){ if(typeof v==="string" && v.trim().startsWith("var(")){ const nm=v.trim().slice(4,-1).trim();
   return getComputedStyle(document.documentElement).getPropertyValue(nm).trim() || "#8891a0"; } return v; }
 function teardown3D(){ if(org3dGraph){ try{ org3dGraph._destructor&&org3dGraph._destructor(); }catch(e){} org3dGraph=null; } }
+function load3DScript(src){ return new Promise((ok,no)=>{ const s=document.createElement("script"); s.src=src; s.onload=()=>ok(src); s.onerror=()=>no(src); document.head.appendChild(s); }); }
 function ensure3D(cb){ if(window.ForceGraph3D) return cb();
   if(window.__l3d){ window.__l3d.push(cb); return; } window.__l3d=[cb];
-  const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.4/dist/3d-force-graph.min.js";
-  s.onload=()=>{ (window.__l3d||[]).forEach(f=>f()); window.__l3d=null; };
-  s.onerror=()=>{ window.__l3d=null; toast("Couldn't load the 3D view (network)."); org3d=false;
-    document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); };
-  document.head.appendChild(s); }
+  (async()=>{ try{
+    // THREE r150 first (shares one instance with the graph), then labels lib, then the graph
+    if(!window.THREE) await load3DScript("https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js");
+    if(!window.SpriteText) await load3DScript("https://cdn.jsdelivr.net/npm/three-spritetext@1.8.2/dist/three-spritetext.min.js").catch(()=>{}); // labels optional
+    if(!window.ForceGraph3D) await load3DScript("https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.4/dist/3d-force-graph.min.js");
+    (window.__l3d||[]).forEach(f=>f()); window.__l3d=null;
+  }catch(e){ window.__l3d=null; toast("Couldn't load the 3D view (network)."); org3d=false;
+    document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); } })(); }
+/* always-on 3D node label (department/member/task name), like the Campus Assistant brain */
+function node3DObject(n){ if(!window.SpriteText) return null;
+  const s=new SpriteText(n.name||"");
+  s.color = n.color || "#e5e7eb";
+  s.textHeight = n.kind==="center"?7 : n.kind==="owner"?5.5 : n.kind==="section"?4 : 3;
+  s.fontWeight = (n.kind==="task")?"500":"700";
+  s.backgroundColor = false; s.padding = 0;
+  s.strokeColor = "#0b1020"; s.strokeWidth = 0.6;
+  s.position.set(0, (n.kind==="center"?12 : n.kind==="owner"?10 : n.kind==="section"?7.5 : 5.5), 0);
+  s.material.depthWrite = false;
+  return s; }
 /* ---- hierarchy + progressive disclosure (collapse/expand) — shared by 2D & 3D ---- */
 let orgExpanded = new Set();   // ids of nodes the user has opened; the centre is always open
 function orgTree(){
@@ -1930,7 +1945,8 @@ function render3D(canvas){
         .linkColor(l=>l.color).linkOpacity(.5).linkWidth(l=>l.cp?1.8:(l.dep?0.5:0.7))
         .linkDirectionalArrowLength(l=>l.dep?3.4:0).linkDirectionalArrowRelPos(1)
         .onNodeClick(n=>{ if(n.kind==="task"){ if(n.tid) openTaskDrawer(n.tid); }
-          else if(n.hasKids){ orgToggle(n.nid); org3dGraph.graphData(orgGraphData()); } }); }
+          else if(n.hasKids){ orgToggle(n.nid); org3dGraph.graphData(orgGraphData()); } });
+      if(window.SpriteText) org3dGraph.nodeThreeObjectExtend(true).nodeThreeObject(node3DObject); }
     org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
   }); }
 function orgExpandAll(){ orgExpanded.clear(); (function w(n){ if(orgHasKids(n)&&n.kind!=="center") orgExpanded.add(n.id); (n.children||[]).forEach(w); })(orgTree()); }
@@ -2064,6 +2080,7 @@ function orgToggleFull(){ const w=$("#orgview"); const on=w.classList.toggle("fu
   setTimeout(renderOrg,30); }
 { const fb=$("#orgFull"); if(fb) fb.onclick=orgToggleFull; }
 document.querySelectorAll(".dimtog").forEach(b=>b.onclick=()=>{ org3d=(b.dataset.dim==="3d");
+  if(org3d && orgExpanded.size===0) orgExpandAll();   // open 3D as the full labelled brain, like the reference
   document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
 function renderTimeline(){ if(timelineView==="org") renderOrg(); else if(timelineView==="model") renderModel(); else renderGrid(); }
 
