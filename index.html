@@ -290,6 +290,15 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .onode.dim{opacity:.16}
 .ocenter-label{fill:var(--txt); font-weight:800; font-size:13px}
 .osec-label{fill:var(--txt2); font-weight:700; font-size:11px}
+.otask-label{font-size:10px; font-weight:600; fill:var(--txt); paint-order:stroke; stroke:var(--panel-solid); stroke-width:2.6px; stroke-linejoin:round; pointer-events:none}
+/* organization legend overlay */
+.orglegend{position:absolute; left:12px; bottom:12px; display:flex; flex-wrap:wrap; gap:6px 13px; align-items:center;
+  padding:8px 12px; border-radius:10px; background:color-mix(in srgb,var(--panel-solid) 90%,transparent);
+  border:1px solid var(--line); box-shadow:var(--card-shadow); font-size:11px; color:var(--txt2); pointer-events:none; max-width:min(94%,560px); z-index:2}
+.orglegend .lg{display:inline-flex; align-items:center; gap:5px; white-space:nowrap}
+.orglegend .sw{width:10px; height:10px; border-radius:3px; flex:none}
+.orglegend .swl{display:inline-block; width:16px; height:0; border-top:3px solid var(--txt2); border-radius:2px}
+.orglegend .lgsep{opacity:.35}
 
 /* ============ CONTROLS ============ */
 .controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px}
@@ -878,6 +887,7 @@ input:focus-visible,select:focus-visible{outline:none}
       <button class="orgbtn" id="orgFull" type="button" title="Toggle full screen">⛶ Full screen</button>
     </div>
     <div class="orgcanvas" id="orgcanvas"></div>
+    <div class="orglegend" id="orglegend" style="display:none"></div>
   </div>
   </div><!-- /viewTimeline -->
 
@@ -1726,7 +1736,7 @@ function orgGraphData(){
   const nodes=[{id:"__c",name:(cfg.project_name||cfg.title||"Project"),color:cssColor("var(--deo)"),val:10,kind:"center"}], links=[];
   if(byOwner){
     ownerList().forEach(o=>{ const oc=cssColor(ownerColor(o)); nodes.push({id:"o:"+o,name:o,color:oc,val:6,kind:"owner"}); links.push({source:"__c",target:"o:"+o,color:oc});
-      all.filter(t=>ownerCanon(t.owner)===o).forEach(t=>{ nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:oc,val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:"o:"+o,target:t.id,color:oc}); }); });
+      all.filter(t=>ownerCanon(t.owner)===o).forEach(t=>{ nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:cssColor(taskStatusColor(t)),val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:"o:"+o,target:t.id,color:oc}); }); });
   } else {
     sectionsOf(all).forEach((sec,i)=>{ const sid="s:"+i; nodes.push({id:sid,name:sec,color:cssColor("var(--txt2)"),val:5,kind:"section"}); links.push({source:"__c",target:sid,color:cssColor("var(--line-strong)")});
       all.filter(t=>t.section===sec).forEach(t=>{ const c=cssColor(taskStatusColor(t)); nodes.push({id:t.id,name:t.name+" · "+t.comp+"%",color:c,val:2+(+t.comp||0)/40,tid:t.id}); links.push({source:sid,target:t.id,color:c}); }); });
@@ -1742,12 +1752,20 @@ function render3D(canvas){
         .onNodeClick(n=>{ if(n.tid) openTask(n.tid); }); }
     org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
   }); }
+function renderOrgLegend(byOwner){ const el=$("#orglegend"); if(!el) return; const sc=statusColors();
+  const dot=(c,l)=>`<span class="lg"><span class="sw" style="background:${c}"></span>${l}</span>`;
+  let h=dot(sc.done,"Done")+dot(sc.progress,"In progress")+dot(sc.behind,"Behind")+dot(sc.next,"Upcoming");
+  h+=`<span class="lgsep">·</span><span class="lg">node = status</span>`;
+  if(byOwner) h+=`<span class="lgsep">·</span><span class="lg"><span class="swl"></span>line = member</span>`;
+  el.innerHTML=h; el.style.display=""; }
 function renderOrg(){
   const canvas=$("#orgcanvas"); if(!canvas) return;
+  const byOwner=(orgColorBy==="owner");
+  renderOrgLegend(byOwner);
   if(org3d){ render3D(canvas); return; }
   teardown3D(); if(canvas.querySelector("canvas")) canvas.innerHTML="";
   const all=tasks||[];
-  const byOwner=(orgColorBy==="owner");
+  const trunc=(s,m)=>{ s=String(s||""); return s.length>m ? s.slice(0,m-1)+"…" : s; };
   const nodes=[], edges=[], byId={};
   const proj=cfg.project_name||cfg.title||"Project";
   nodes.push({id:"__c", kind:"center", x:0, y:0, r:32, label:proj});
@@ -1763,7 +1781,7 @@ function renderOrg(){
       const spread=Math.min(Math.PI*1.25, 0.5 + n*0.13), R2=100 + Math.min(140, n*5.5);
       items.forEach((t,j)=>{
         const a2=ang + (n>1 ? (j/(n-1)-0.5)*spread : 0), rr=R2 + ((j%2)?20:0);
-        nodes.push({id:"t"+t.id, kind:"task", x:ox+Math.cos(a2)*rr, y:oy+Math.sin(a2)*rr, r:5+Math.round((+t.comp||0)/100*5), task:t});
+        nodes.push({id:"t"+t.id, kind:"task", x:ox+Math.cos(a2)*rr, y:oy+Math.sin(a2)*rr, pax:ox, pay:oy, r:5+Math.round((+t.comp||0)/100*5), task:t});
         edges.push({a:oid, b:"t"+t.id, w:1.3, color:oc});
       });
     });
@@ -1779,17 +1797,28 @@ function renderOrg(){
       const spread=Math.min(Math.PI*1.2, 0.5 + n*0.14), R2=86 + Math.min(110, n*5);
       items.forEach((t,j)=>{
         const a2=ang + (n>1 ? (j/(n-1)-0.5)*spread : 0), rr=R2 + ((j%2)?18:0);
-        nodes.push({id:"t"+t.id, kind:"task", x:sx+Math.cos(a2)*rr, y:sy+Math.sin(a2)*rr, r:5+Math.round((+t.comp||0)/100*5), task:t});
+        nodes.push({id:"t"+t.id, kind:"task", x:sx+Math.cos(a2)*rr, y:sy+Math.sin(a2)*rr, pax:sx, pay:sy, r:5+Math.round((+t.comp||0)/100*5), task:t});
         edges.push({a:sid, b:"t"+t.id, w:1, color:taskStatusColor(t)});
       });
     });
   }
   nodes.forEach(n=>byId[n.id]=n);
+  // node fill ALWAYS encodes task status (owner is shown by the branch/line colour instead)
   const nodeColor=n=> n.kind==="center"?"var(--deo)" : n.kind==="section"?"var(--txt2)"
-    : n.kind==="owner"?ownerColor(n.owner) : (byOwner?ownerColor(n.task.owner):taskStatusColor(n.task));
-  // auto-fit viewBox so the graph fills the canvas
+    : n.kind==="owner"?ownerColor(n.owner) : taskStatusColor(n.task);
+  // precompute a radial, rotated label for every task node so each one is identifiable
+  nodes.forEach(n=>{ if(n.kind!=="task") return;
+    const dx=n.x-n.pax, dy=n.y-n.pay, ang=Math.atan2(dy,dx)||0;
+    const gap=n.r+5, lx=n.x+Math.cos(ang)*gap, ly=n.y+Math.sin(ang)*gap;
+    const deg=ang*180/Math.PI, flip=(deg>90||deg<-90), txt=trunc(n.task.name,20);
+    const len=txt.length*5.6+6;
+    n._lab={lx,ly, deg:(flip?deg+180:deg), anchor:(flip?"end":"start"), txt,
+      fx:lx+Math.cos(ang)*len, fy:ly+Math.sin(ang)*len}; });
+  // auto-fit viewBox so the graph (and its labels) fills the canvas
   let mnX=1e9,mnY=1e9,mxX=-1e9,mxY=-1e9;
-  nodes.forEach(n=>{ const p=n.r+(n.kind!=="task"?24:5); mnX=Math.min(mnX,n.x-p); mxX=Math.max(mxX,n.x+p); mnY=Math.min(mnY,n.y-p); mxY=Math.max(mxY,n.y+p); });
+  const ext=(x,y)=>{ mnX=Math.min(mnX,x); mxX=Math.max(mxX,x); mnY=Math.min(mnY,y); mxY=Math.max(mxY,y); };
+  nodes.forEach(n=>{ const p=n.r+(n.kind!=="task"?24:5); ext(n.x-p,n.y-p); ext(n.x+p,n.y+p);
+    if(n._lab){ ext(n._lab.lx,n._lab.ly); ext(n._lab.fx,n._lab.fy); } });
   const P=44; mnX-=P; mnY-=P; mxX+=P; mxY+=P;
   let svg=`<svg viewBox="${mnX.toFixed(0)} ${mnY.toFixed(0)} ${(mxX-mnX).toFixed(0)} ${(mxY-mnY).toFixed(0)}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Project organization graph"><g id="orgpan" transform="translate(${orgPanX},${orgPanY}) scale(${orgZoom})">`;
   edges.forEach(e=>{ const a=byId[e.a], b=byId[e.b]; if(!a||!b) return;
@@ -1801,6 +1830,8 @@ function renderOrg(){
     svg+=`<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${n.r}" fill="${nodeColor(n)}" stroke="var(--panel-solid)" stroke-width="1.5"/>`;
     if(n.kind==="center") svg+=`<text class="ocenter-label" x="${n.x}" y="${(n.y+n.r+17).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
     else if(n.kind==="section"||n.kind==="owner") svg+=`<text class="osec-label" x="${n.x}" y="${(n.y-n.r-7).toFixed(1)}" text-anchor="middle">${esc(n.label)}</text>`;
+    else if(n._lab){ const L=n._lab;
+      svg+=`<text class="otask-label" x="${L.lx.toFixed(1)}" y="${L.ly.toFixed(1)}" text-anchor="${L.anchor}" dominant-baseline="middle" transform="rotate(${L.deg.toFixed(1)} ${L.lx.toFixed(1)} ${L.ly.toFixed(1)})">${esc(L.txt)}</text>`; }
     svg+=`</g>`;
   });
   svg+=`</g></svg>`;
