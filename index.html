@@ -3036,7 +3036,8 @@ function renderBudgetHero(c,pct){
     const A=cum.map(v=> cumNow>0? v*scl : 0);
     let lo=0, hi=N-1;
     if(budgetRange!=="full"){ const p=+budgetRange.slice(1), per=N/3; lo=Math.floor(p*per); hi=Math.min(N-1,Math.max(lo+1,Math.floor((p+1)*per))); }
-    const yMax=(Math.max(1,...A))*1.12, W=760,H=250,padL=54,padR=14,padT=16,padB=32, span=Math.max(1,hi-lo);
+    const ceil = scopeAll? totalE : 0;   // show the budget ceiling when viewing the whole project
+    const yMax=(Math.max(1,...A,ceil))*1.08, W=760,H=250,padL=54,padR=14,padT=16,padB=32, span=Math.max(1,hi-lo);
     const px=w=> padL+((w-lo)/span)*(W-padL-padR), py=v=> H-padB-(v/yMax)*(H-padT-padB);
     let grid=""; for(let i=0;i<=3;i++){ const v=yMax*i/3,y=py(v); grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--grid-line)" stroke-width="1"/><text x="${padL-8}" y="${(y+3).toFixed(1)}" text-anchor="end" style="fill:var(--mut);font-size:9px;font-family:var(--mono)">${money(v).replace('.00','')}</text>`; }
     let xlab=""; const stp=Math.max(1,Math.ceil(span/6)); for(let w=lo;w<=hi;w+=stp){ xlab+=`<text x="${px(w).toFixed(1)}" y="${H-padB+15}" text-anchor="middle" style="fill:var(--mut);font-size:9px">${esc((cfg.weeks[w]||{}).label||('W'+(w+1)))}</text>`; }
@@ -3045,7 +3046,8 @@ function renderBudgetHero(c,pct){
     const area=`${line} L${px(hi).toFixed(1)},${py(0).toFixed(1)} L${px(lo).toFixed(1)},${py(0).toFixed(1)} Z`;
     const nn= now>=lo&&now<=hi;
     const marker= nn? `<circle cx="${px(now).toFixed(1)}" cy="${py(A[now]).toFixed(1)}" r="4" fill="${cLine}" stroke="var(--panel-solid)" stroke-width="2"/><text x="${px(now).toFixed(1)}" y="${(py(A[now])-9).toFixed(1)}" text-anchor="middle" style="fill:var(--txt);font-size:10px;font-weight:800;font-family:var(--mono)">+${money(recent).replace('.00','')}</text>`:"";
-    return `<div class="evmchart-scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;display:block" role="img" aria-label="Cost trend">${grid}${xlab}<path d="${area}" fill="${cLine}" fill-opacity="0.10"/><path d="${line}" fill="none" stroke="${cLine}" stroke-width="2.4"/>${marker}</svg></div>`;
+    const estLine = ceil? `<line x1="${padL}" y1="${py(ceil).toFixed(1)}" x2="${W-padR}" y2="${py(ceil).toFixed(1)}" stroke="var(--mut)" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.6"/><text x="${W-padR}" y="${(py(ceil)-5).toFixed(1)}" text-anchor="end" style="fill:var(--mut);font-size:9px;font-family:var(--mono)">Estimate ${money(ceil).replace('.00','')}</text>` : "";
+    return `<div class="evmchart-scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;display:block" role="img" aria-label="Cost trend">${grid}${xlab}${estLine}<path d="${area}" fill="${cLine}" fill-opacity="0.10"/><path d="${line}" fill="none" stroke="${cLine}" stroke-width="2.4"/>${marker}</svg></div>`;
   }
   const chips=[["all","All budget",totalA]].concat(members.map(m=>[m,m,memberCost(m)]))
     .map(([id,label,val])=>`<button class="bchip ${budgetScope===id?'on':''}" data-bscope="${esc(id)}">${esc(label)} <span class="bchipv">${money(val)}</span></button>`).join("");
@@ -3068,6 +3070,8 @@ function renderBudgetHero(c,pct){
   return `<div class="aura">${rail}${main}</div>`;
 }
 function renderBudgetOverview(c,pct){
+  // A focused, professional dashboard: hero (metrics + rail + trend), a short read-out,
+  // what needs attention, and one clean variance table. Everything else is covered by the hero.
   const cols=budgetCatColors();
   const cats=[
     {name:"Direct Labor",a:c.TDLa,e:c.TDLe,col:cols[0]},
@@ -3076,24 +3080,12 @@ function renderBudgetOverview(c,pct){
     {name:"Equipment",a:c.ETRMa,e:c.ETRMe,col:cols[3]},
     {name:"Overhead",a:c.bizA,e:c.bizE,col:cols[4]},
   ];
-  const totalE=c.totalE, totalA=c.totalA, remaining=Math.max(0,totalE-totalA);
-  const usedPct= totalE? totalA/totalE*100 : 0;
-  const projected = pct>1 ? totalA/(pct/100) : totalE;   // linear burn projection
-  const variance = totalE - projected;                    // + = under budget
-  const overPace = usedPct > pct+6;
-  const lim = +cfg.budget_limit||0;
-  const hero=`<div class="bchart full"><h4>Cost vs schedule — earned-value view</h4><p class="csub">Money spent, planned budget, and value of work done across the ${(cfg.weeks||[]).length}-week schedule</p>${evmChart(c)}</div>`;
-  const charts=`<div class="bcharts">
-    <div class="bchart"><h4>Actual vs estimate by category</h4><p class="csub">Solid = spent · hatched = estimated · red tick = over</p>${bulletChart(cats)}</div>
-    <div class="bchart"><h4>Estimated budget composition</h4><p class="csub">Share of the ${money(totalE)} estimate</p>${donutChart(cats.filter(x=>x.e>0),totalE)}</div>
-    <div class="bchart"><h4>Spending pace</h4><p class="csub">Is spend keeping step with the schedule?</p>${paceChart(usedPct,pct)}</div>
-    <div class="bchart">${memberCostChart()}</div>
-  </div>`;
+  const totalE=c.totalE, totalA=c.totalA, lim=+cfg.budget_limit||0;
   const tbl=`<div class="bchart full"><h4>Variance analysis</h4><p class="csub">Estimate vs actual by category — positive variance is under budget</p>${varianceTable(cats,totalE,totalA)}</div>`;
   let limitNote="";
   if(lim){ const over=totalE>lim; limitNote=`<div class="blimit ${over?'over':'ok'}" style="margin-top:14px">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(totalE)} of ${money(lim)} cap set by admin${over?` (${money(totalE-lim)} over)`:''}.</div>`; }
   const printHdr=`<div class="print-only print-hdr"><div class="ph-eyebrow">Executive Budget &amp; Status Report</div><h1>${esc(cfg.project_name||cfg.title||"Project")}</h1><div class="ph-meta">${esc(cfg.class_name||cfg.title||"")}${cfg.semester?" · "+esc(cfg.semester):""}${cfg.group_label?" · "+esc(cfg.group_label):""} · Generated ${new Date().toLocaleDateString("en-US",{year:'numeric',month:'long',day:'numeric'})}</div></div>`;
-  return printHdr + renderBudgetHero(c,pct) + budgetInsights(c) + riskPanel() + charts + tbl + hero + burndownChart() + workloadPanel() + limitNote;
+  return printHdr + renderBudgetHero(c,pct) + budgetInsights(c) + riskPanel() + tbl + limitNote;
 }
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
