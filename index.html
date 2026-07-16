@@ -650,6 +650,20 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .wl-badge.ok{background:color-mix(in srgb,var(--ok) 15%,transparent); color:var(--ok)}
 .wl-badge.low{background:color-mix(in srgb,#fab219 18%,transparent); color:#b7791f}
 [data-theme="dark"] .wl-badge.low{color:#fab219}
+/* risk register & alerts */
+.risk-alerts{display:flex; flex-direction:column; gap:7px; margin-bottom:13px}
+.risk-alert{font-size:12.5px; padding:8px 11px; border-radius:8px; border:1px solid; display:flex; align-items:center; gap:8px}
+.risk-alert.high{background:color-mix(in srgb,var(--bad) 10%,transparent); border-color:color-mix(in srgb,var(--bad) 35%,transparent); color:var(--bad)}
+.risk-alert.med{background:color-mix(in srgb,#fab219 12%,transparent); border-color:color-mix(in srgb,#fab219 35%,transparent); color:#b7791f}
+[data-theme="dark"] .risk-alert.med{color:#fab219}
+.risk-list{display:flex; flex-direction:column}
+.risk-row{display:flex; align-items:center; gap:11px; padding:9px 4px; border-bottom:1px solid var(--grid-line)}
+.risk-row:last-child{border-bottom:0}
+.risk-dot{width:10px; height:10px; border-radius:50%; flex:none}
+.risk-dot.high{background:var(--bad)} .risk-dot.med{background:#fab219}
+.risk-main{flex:1; min-width:0}
+.risk-nm{font-size:13px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.risk-sub{font-size:11.5px; color:var(--mut); margin-top:1px}
 
 .btable{background:var(--panel); backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); overflow:hidden; margin-bottom:14px}
 .bth{display:grid; grid-template-columns:1.6fr repeat(2,1fr); gap:10px; padding:12px 18px; background:var(--sec-bg); border-bottom:1px solid var(--line); font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--mut)}
@@ -2853,6 +2867,52 @@ function workloadPanel(){
   }).join("");
   return `<div class="bchart full"><h4>Team workload &amp; capacity</h4><p class="csub">Logged vs planned hours per member — spot who is over- or under-allocated</p><div class="bullet">${bars}</div></div>`;
 }
+/* effort burndown: hours of work remaining vs the ideal on-schedule line */
+function burndownChart(){
+  const N=Math.max(2,(cfg.weeks||[]).length||2), now=Math.max(0,Math.min(N-1,cfg.now_week||0));
+  const totalEst=(tasks||[]).reduce((s,t)=>s+num(t.est_hours),0);
+  if(totalEst<=0) return `<div class="bchart full"><h4>Effort burndown</h4><p class="csub" style="color:var(--mut)">Add estimated hours to tasks to see the burndown.</p></div>`;
+  const dark=document.documentElement.getAttribute("data-theme")==="dark";
+  const cBlue=dark?"#3987e5":"#2a78d6", cGray="#94a3b8";
+  const wk=new Array(N).fill(0);
+  (tasks||[]).forEach(t=>{ const hbw=t.hours_by_week||{}; Object.keys(hbw).forEach(w=>{ const i=+w; if(i>=0&&i<N) wk[i]+=num(hbw[w]); }); });
+  let cum=[],run=0; for(let i=0;i<N;i++){ run+=wk[i]; cum.push(run); }
+  let wc=0; (tasks||[]).forEach(t=>{ wc+=num(t.est_hours)*(num(t.comp)/100); });
+  const cumNow=cum[now]||0, scl=cumNow>0? wc/cumNow : 0;
+  const remaining=[]; for(let i=0;i<=now;i++){ const done= cumNow>0? cum[i]*scl : wc*(i+1)/(now+1); remaining.push(Math.max(0,totalEst-done)); }
+  const ideal=[]; for(let i=0;i<N;i++){ ideal.push(totalEst*(1-i/(N-1))); }
+  const yMax=(totalEst*1.05)||1;
+  const W=680,H=250,padL=48,padR=16,padT=14,padB=34;
+  const px=w=> padL + (w/(N-1))*(W-padL-padR);
+  const py=v=> H-padB - (v/yMax)*(H-padT-padB);
+  const path=arr=>arr.map((v,i)=>`${i?'L':'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(" ");
+  let grid=""; for(let i=0;i<=4;i++){ const v=yMax*i/4, y=py(v); grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--grid-line)" stroke-width="1"/><text x="${padL-8}" y="${(y+3).toFixed(1)}" text-anchor="end" style="fill:var(--mut);font-size:9px;font-family:var(--mono)">${Math.round(v)}h</text>`; }
+  let xlab=""; const step=Math.max(1,Math.ceil(N/8)); for(let w=0;w<N;w+=step){ xlab+=`<text x="${px(w).toFixed(1)}" y="${H-padB+15}" text-anchor="middle" style="fill:var(--mut);font-size:9px">${esc((cfg.weeks[w]||{}).label||('W'+(w+1)))}</text>`; }
+  const tx=px(now).toFixed(1), behind = remaining[now] > ideal[now]+0.5;
+  const dots=remaining.map((v,i)=>`<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="2.3" fill="${cBlue}"><title>${esc((cfg.weeks[i]||{}).label||('W'+(i+1)))}: ${Math.round(v)}h remaining</title></circle>`).join("");
+  const svg=`<div class="evmchart-scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;display:block" role="img" aria-label="Effort burndown">${grid}${xlab}<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${H-padB}" stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3 3"/><text x="${tx}" y="${padT-4}" text-anchor="middle" style="fill:var(--txt2);font-size:9px;font-weight:700">TODAY</text><path d="${path(ideal)}" fill="none" stroke="${cGray}" stroke-width="2" stroke-dasharray="6 4"/><path d="${path(remaining)}" fill="none" stroke="${cBlue}" stroke-width="2.6"/>${dots}</svg></div>`;
+  const leg=`<div class="evmleg"><span><i style="background:${cBlue}"></i>Remaining effort</span><span><i style="background:${cGray}"></i>Ideal on-schedule burndown</span><span style="margin-left:auto;color:${behind?'var(--bad)':'var(--ok)'};font-weight:700">${behind?'▲ Behind ideal — work is piling up':'✓ On or ahead of the ideal line'}</span></div>`;
+  return `<div class="bchart full"><h4>Effort burndown</h4><p class="csub">Estimated hours of work remaining vs the ideal on-schedule pace (${Math.round(totalEst)}h total)</p>${svg}${leg}</div>`;
+}
+/* risk register: at-risk tasks (overdue / behind pace) + project-level alerts, ranked by severity */
+function riskPanel(){
+  const now=cfg.now_week||0, risks=[];
+  (tasks||[]).forEach(t=>{ const comp=+t.comp||0; if(comp>=100) return; const est=num(t.est_hours)||1;
+    if(t.w1<now){ const late=now-t.w1; risks.push({t, sev:(3+late)*(1+est/50), late:true, why:`${late} wk${late===1?'':'s'} overdue · ${comp}% done`}); }
+    else if(t.w0<=now && now<=t.w1){ const dur=Math.max(1,t.w1-t.w0+1), expected=((now-t.w0+1)/dur)*100;
+      if(comp<expected-20) risks.push({t, sev:(2+(expected-comp)/40)*(1+est/50), late:false, why:`behind pace · ${comp}% of ~${Math.round(expected)}% expected`}); } });
+  risks.sort((a,b)=>b.sev-a.sev);
+  const c=calcBudget(), pct=timePct(), used=c.totalE?c.totalA/c.totalE*100:0, alerts=[];
+  if(cfg.budget_limit && c.totalE> +cfg.budget_limit) alerts.push({sev:'high', txt:`Budget estimate ${money(c.totalE)} exceeds the ${money(+cfg.budget_limit)} admin cap`});
+  if(used>pct+8) alerts.push({sev:'med', txt:`Spending is ahead of schedule (${Math.round(used)}% of budget vs ${Math.round(pct)}% of time)`});
+  const members=memberList(), sharedEst=(tasks||[]).filter(t=>ownerCanon(t.owner)==="Shared").reduce((s,t)=>s+num(t.est_hours),0);
+  members.forEach(m=>{ const own=(tasks||[]).filter(t=>ownerCanon(t.owner)===m), planned=own.reduce((s,t)=>s+num(t.est_hours),0)+sharedEst/members.length, logged=memberActualHours(m);
+    if(planned>0 && logged/planned>1.15) alerts.push({sev:'med', txt:`${m} is over-allocated (${Math.round(logged/planned*100)}% of planned hours)`}); });
+  if(!risks.length && !alerts.length) return `<div class="bchart full"><h4>Risk register &amp; alerts</h4><p class="csub" style="color:var(--ok)">✓ No risks flagged — everything is on track and within plan.</p></div>`;
+  const rows=risks.slice(0,6).map(r=>`<div class="risk-row"><span class="risk-dot ${r.late?'high':'med'}"></span><div class="risk-main"><div class="risk-nm">${esc(r.t.name)}</div><div class="risk-sub">${esc(r.t.section)} · ${r.why}</div></div>${avatarHTML(r.t.owner,22)}</div>`).join("");
+  const al=alerts.map(a=>`<div class="risk-alert ${a.sev}">${a.sev==='high'?'⚠':'●'} ${esc(a.txt)}</div>`).join("");
+  return `<div class="bchart full"><h4>Risk register &amp; alerts</h4><p class="csub">Tasks and conditions that need attention, ranked by severity</p>${al?`<div class="risk-alerts">${al}</div>`:""}${rows?`<div class="risk-list">${rows}</div>`:`<p class="csub" style="color:var(--ok)">✓ No at-risk tasks.</p>`}</div>`;
+}
 function renderBudgetOverview(c,pct){
   const cols=budgetCatColors();
   const cats=[
@@ -2886,7 +2946,7 @@ function renderBudgetOverview(c,pct){
   const tbl=`<div class="bchart full"><h4>Variance analysis</h4><p class="csub">Estimate vs actual by category — positive variance is under budget</p>${varianceTable(cats,totalE,totalA)}</div>`;
   let limitNote="";
   if(lim){ const over=totalE>lim; limitNote=`<div class="blimit ${over?'over':'ok'}" style="margin-top:14px">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(totalE)} of ${money(lim)} cap set by admin${over?` (${money(totalE-lim)} over)`:''}.</div>`; }
-  return kpi + budgetInsights(c) + hero + charts + workloadPanel() + tbl + limitNote;
+  return kpi + budgetInsights(c) + riskPanel() + hero + burndownChart() + charts + workloadPanel() + tbl + limitNote;
 }
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
