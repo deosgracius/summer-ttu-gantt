@@ -2077,10 +2077,11 @@ function node3DObject(n){ if(!window.THREE) return null;
   else if(n.kind==="owner"){ // members (incl. Shared) render as big as the project node
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:initialsTex(n.av,n.avColor||n.color),depthWrite:false})); sp.scale.set(30,30,1); g.add(sp); half=15; }
   else { g.add(sphereMesh(n.color,5.5)); half=5.5; }                 // task leaf — bigger dot, still smaller than the hubs
-  const big=(n.kind!=="task");
-  const label=txtSprite(n.name||"", big?40:26, big?12:6.5);
-  label.position.set(0, -(half+(big?7:4)), 0);
-  if(n.kind==="task"){ label.visible=!!orgIsolate; label.userData.leafLabel=true; }   // outer labels show when isolated (or on hover)
+  const big=(n.kind!=="task"), iso=!!orgIsolate;
+  // labels grow while isolated so a tight branch reads clearly
+  const label=txtSprite(n.name||"", big?40:28, big?(iso?16:12):(iso?12:6.5));
+  label.position.set(0, -(half+(big?7:(iso?6:4))), 0);
+  if(n.kind==="task"){ label.visible=iso; label.userData.leafLabel=true; }   // outer labels show when isolated (or on hover)
   g.add(label); return g; }
 /* ---- hierarchy + progressive disclosure (collapse/expand) — shared by 2D & 3D ---- */
 let orgExpanded = new Set();   // ids of nodes the user has opened; the centre is always open
@@ -2152,13 +2153,14 @@ function orgEdgeColor(parent,child){
   return "var(--line-strong)"; }
 // deterministic concentric "second brain" layout (ported constants: R_HUB 140, R_MEM 320, R_LEAF 480, BASE 6, GAP 0.08)
 function orgLayoutPositions(){
-  const root=orgTree(), R=[0,140,320,480,640], BASE=6;
-  const rad=d=> d<R.length? R[d] : R[R.length-1]+(d-R.length+1)*160;
+  // isolated view is a small branch → pack it tight so the camera stays close and labels read big
+  const root=orgTree(), R = orgIsolate ? [0,95,180,265,345] : [0,140,320,480,640], BASE=6;
+  const rad=d=> d<R.length? R[d] : R[R.length-1]+(d-R.length+1)*(orgIsolate?90:160);
   const leaves=node=>{ const c=orgVisKids(node); if(!c.length) return 1; return c.reduce((s,ch)=>s+leaves(ch),0); };
   const pos={};
   (function place(node,depth,a0,a1,idx){
     const ang=(a0+a1)/2 - Math.PI/2, isLeaf=orgVisKids(node).length===0;
-    const r=rad(depth) + (isLeaf && depth>=2 ? ((idx%2)? 48 : 0) : 0);   // stagger alternate leaves outward
+    const r=rad(depth) + (isLeaf && depth>=2 ? ((idx%2)? (orgIsolate?22:48) : 0) : 0);   // stagger alternate leaves outward
     pos[node.id]={x:Math.cos(ang)*r, y:Math.sin(ang)*r};
     const c=orgVisKids(node); if(!c.length) return;
     // weight each branch by (leaf-count + BASE) so small branches still get room; GAP between top-level sectors
