@@ -620,6 +620,17 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .paceleg{display:flex; gap:16px; margin-top:10px; font-size:12px; color:var(--mut); flex-wrap:wrap}
 .paceleg span{display:inline-flex; align-items:center; gap:6px}
 .paceleg i{width:12px; height:12px; border-radius:3px; display:inline-block}
+/* Earned-Value (cost vs schedule) hero chart */
+.evmmets{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px}
+.evmmet{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:10px 13px}
+.evmmet .em-k{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; color:var(--mut)}
+.evmmet .em-v{font-size:22px; font-weight:750; font-variant-numeric:tabular-nums; margin-top:3px; color:var(--txt)}
+.evmmet .em-v.g{color:var(--ok)} .evmmet .em-v.b{color:var(--bad)}
+.evmmet .em-s{font-size:11px; color:var(--mut); margin-top:3px}
+.evmleg{display:flex; flex-wrap:wrap; gap:16px; margin-top:12px; font-size:12px; color:var(--txt2)}
+.evmleg span{display:inline-flex; align-items:center; gap:7px}
+.evmleg i{width:15px; height:4px; border-radius:2px; display:inline-block; flex:none}
+.evmchart-scroll{overflow-x:auto}
 
 .btable{background:var(--panel); backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); overflow:hidden; margin-bottom:14px}
 .bth{display:grid; grid-template-columns:1.6fr repeat(2,1fr); gap:10px; padding:12px 18px; background:var(--sec-bg); border-bottom:1px solid var(--line); font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--mut)}
@@ -2741,6 +2752,61 @@ function varianceTable(cats,totalE,totalA){
   const v=totalE-totalA, vp=totalE?Math.round(v/totalE*100):0, cls=v>=0?'pos':'neg';
   const tot=`<tr class="vt-tot"><td>Total</td><td>${money(totalE)}</td><td>${money(totalA)}</td><td class="vt-var ${cls}">${v<0?'−':''}${money(Math.abs(v))}</td><td class="vt-var ${cls}">${v<0?'−':''}${Math.abs(vp)}%</td></tr>`;
   return `<table class="vartable"><thead><tr><th>Category</th><th>Estimate</th><th>Actual</th><th>Variance</th><th>Var %</th></tr></thead><tbody>${body}${tot}</tbody></table>`; }
+/* Earned-Value Management chart: planned budget vs actual cost vs value-of-work-done, over the schedule */
+function evmChart(c){
+  const N=Math.max(2,(cfg.weeks||[]).length||2), now=Math.max(0,Math.min(N-1,cfg.now_week||0));
+  const totalE=c.totalE, totalA=c.totalA;
+  const dark=document.documentElement.getAttribute("data-theme")==="dark";
+  const cBlue=dark?"#3987e5":"#2a78d6", cGreen="#008300", cGray="#94a3b8";
+  const laborRate=o=>{ const L=budget.labor||[]; const line=L.find(r=>r.name===o); return line?num(line.rate):(L[0]?num(L[0].rate):12); };
+  const laborWk=new Array(N).fill(0);
+  (tasks||[]).forEach(t=>{ const hbw=t.hours_by_week||{}, rate=laborRate(ownerCanon(t.owner));
+    Object.keys(hbw).forEach(wk=>{ const w=+wk; if(w>=0&&w<N) laborWk[w]+=num(hbw[wk])*rate; }); });
+  const raw=[]; let run=0; for(let w=0;w<N;w++){ run+=laborWk[w]; raw.push(run); }
+  const rawNow=raw[now]||0, scl=rawNow>0? totalA/rawNow : 0;
+  const AC=[]; for(let w=0;w<=now;w++){ AC.push(rawNow>0? raw[w]*scl : totalA*(w+1)/(now+1)); }
+  const PV=[]; for(let w=0;w<N;w++){ PV.push(totalE*(w+1)/N); }
+  let wsum=0,wc=0; (tasks||[]).forEach(t=>{ const w=num(t.est_hours)||1; wsum+=w; wc+=w*(num(t.comp)/100); });
+  const pctDone=wsum? wc/wsum : 0, EVnow=totalE*pctDone;
+  const EV=[]; for(let w=0;w<=now;w++){ EV.push(EVnow*(w+1)/(now+1)); }
+  const pct=timePct(), projected= pct>1? totalA/(pct/100) : totalE;
+  const yMax=Math.max(totalE,totalA,projected,EVnow,1)*1.08;
+  const W=680,H=300,padL=58,padR=16,padT=16,padB=36;
+  const px=w=> padL + (w/(N-1))*(W-padL-padR);
+  const py=v=> H-padB - (v/yMax)*(H-padT-padB);
+  const path=arr=> arr.map((v,i)=>`${i?'L':'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(" ");
+  let grid=""; for(let i=0;i<=4;i++){ const v=yMax*i/4, y=py(v);
+    grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--grid-line)" stroke-width="1"/>`;
+    grid+=`<text x="${padL-8}" y="${(y+3).toFixed(1)}" text-anchor="end" style="fill:var(--mut);font-size:9px;font-family:var(--mono)">${money(v).replace('.00','')}</text>`; }
+  let xlab=""; const step=Math.max(1,Math.ceil(N/8)); for(let w=0;w<N;w+=step){ const lb=(cfg.weeks[w]||{}).label||('W'+(w+1)); xlab+=`<text x="${px(w).toFixed(1)}" y="${H-padB+15}" text-anchor="middle" style="fill:var(--mut);font-size:9px">${esc(lb)}</text>`; }
+  const tx=px(now).toFixed(1);
+  const today=`<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${H-padB}" stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3 3"/><text x="${tx}" y="${padT-4}" text-anchor="middle" style="fill:var(--txt2);font-size:9px;font-weight:700">TODAY</text>`;
+  const acPath=path(AC);
+  const acArea=`${acPath} L${px(now).toFixed(1)},${py(0).toFixed(1)} L${px(0).toFixed(1)},${py(0).toFixed(1)} Z`;
+  const fc=`M${px(now).toFixed(1)},${py(AC[now]).toFixed(1)} L${px(N-1).toFixed(1)},${py(projected).toFixed(1)}`;
+  let dots=""; for(let w=0;w<=now;w++){ dots+=`<circle cx="${px(w).toFixed(1)}" cy="${py(AC[w]).toFixed(1)}" r="2.3" fill="${cBlue}"><title>${esc((cfg.weeks[w]||{}).label||('W'+(w+1)))}: actual ${money(AC[w])} · earned ${money(EV[w]||0)}</title></circle>`; }
+  const svg=`<div class="evmchart-scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;display:block" role="img" aria-label="Cost vs schedule earned-value chart">
+    ${grid}${xlab}${today}
+    <path d="${acArea}" fill="${cBlue}" fill-opacity="0.10" stroke="none"/>
+    <path d="${path(PV)}" fill="none" stroke="${cGray}" stroke-width="2" stroke-dasharray="6 4"/>
+    <path d="${path(EV)}" fill="none" stroke="${cGreen}" stroke-width="2"/>
+    <path d="${fc}" fill="none" stroke="${cBlue}" stroke-width="2" stroke-dasharray="5 4" stroke-opacity="0.7"/>
+    <path d="${acPath}" fill="none" stroke="${cBlue}" stroke-width="2.6"/>
+    ${dots}
+    <circle cx="${px(now).toFixed(1)}" cy="${py(EVnow).toFixed(1)}" r="3.6" fill="${cGreen}" stroke="var(--panel-solid)" stroke-width="1.5"/>
+    <circle cx="${px(now).toFixed(1)}" cy="${py(AC[now]).toFixed(1)}" r="3.6" fill="${cBlue}" stroke="var(--panel-solid)" stroke-width="1.5"/>
+  </svg></div>`;
+  const leg=`<div class="evmleg"><span><i style="background:${cBlue}"></i>Actual cost</span><span><i style="background:${cGreen}"></i>Earned value (work done)</span><span><i style="background:${cGray}"></i>Planned budget</span><span><i style="background:${cBlue};opacity:.6"></i>Forecast</span></div>`;
+  const PVnow=totalE*(pct/100), CPI= totalA? EVnow/totalA : 0, SPI= PVnow? EVnow/PVnow : 0;
+  const met=(k,v,good,s)=>`<div class="evmmet"><div class="em-k">${k}</div><div class="em-v ${good?'g':'b'}">${v.toFixed(2)}</div><div class="em-s">${s}</div></div>`;
+  const metrics=`<div class="evmmets">
+    ${met("Cost performance (CPI)",CPI,CPI>=1, CPI>=1?"On/under budget for work done":"Over budget for work done")}
+    ${met("Schedule performance (SPI)",SPI,SPI>=1, SPI>=1?"On/ahead of schedule":"Behind schedule")}
+    <div class="evmmet"><div class="em-k">Earned value</div><div class="em-v">${money(EVnow)}</div><div class="em-s">${Math.round(pctDone*100)}% of work complete</div></div>
+    <div class="evmmet"><div class="em-k">Forecast at completion</div><div class="em-v">${money(projected)}</div><div class="em-s">${projected<=totalE?money(totalE-projected)+" under estimate":money(projected-totalE)+" over estimate"}</div></div>
+  </div>`;
+  return metrics+svg+leg;
+}
 function renderBudgetOverview(c,pct){
   const cols=budgetCatColors();
   const cats=[
@@ -2764,6 +2830,7 @@ function renderBudgetOverview(c,pct){
     <div class="kpi" style="--kpi-accent:${overPace?'var(--bad)':'var(--ok)'}"><div class="kk">Projected final</div><div class="kv">${money(projected)}</div><div class="ks">at current burn ${variance>=0?pill('good','▲ '+money(Math.abs(variance))+' under'):pill('bad','▼ '+money(Math.abs(variance))+' over')}</div></div>
     <div class="kpi" style="--kpi-accent:${overPace?'#fab219':'var(--ok)'}"><div class="kk">Budget health</div><div class="kv" style="font-size:20px">${overPace?'Watch pace':'On track'}</div><div class="ks">${Math.round(usedPct)}% spent vs ${Math.round(pct)}% time elapsed</div></div>
   </div>`;
+  const hero=`<div class="bchart full"><h4>Cost vs schedule — earned-value view</h4><p class="csub">Money spent, planned budget, and value of work done across the ${(cfg.weeks||[]).length}-week schedule</p>${evmChart(c)}</div>`;
   const charts=`<div class="bcharts">
     <div class="bchart"><h4>Actual vs estimate by category</h4><p class="csub">Solid = spent · hatched = estimated · red tick = over</p>${bulletChart(cats)}</div>
     <div class="bchart"><h4>Estimated budget composition</h4><p class="csub">Share of the ${money(totalE)} estimate</p>${donutChart(cats.filter(x=>x.e>0),totalE)}</div>
@@ -2773,7 +2840,7 @@ function renderBudgetOverview(c,pct){
   const tbl=`<div class="bchart full"><h4>Variance analysis</h4><p class="csub">Estimate vs actual by category — positive variance is under budget</p>${varianceTable(cats,totalE,totalA)}</div>`;
   let limitNote="";
   if(lim){ const over=totalE>lim; limitNote=`<div class="blimit ${over?'over':'ok'}" style="margin-top:14px">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(totalE)} of ${money(lim)} cap set by admin${over?` (${money(totalE-lim)} over)`:''}.</div>`; }
-  return kpi + charts + tbl + limitNote;
+  return kpi + hero + charts + tbl + limitNote;
 }
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
