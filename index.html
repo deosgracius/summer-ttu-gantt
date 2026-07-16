@@ -664,6 +664,26 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .risk-main{flex:1; min-width:0}
 .risk-nm{font-size:13px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .risk-sub{font-size:11.5px; color:var(--mut); margin-top:1px}
+/* Executive report (print / Save-as-PDF of the budget Overview) */
+.print-only{display:none}
+.print-hdr .ph-eyebrow{font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--deo)}
+.print-hdr h1{font-size:22px; margin:4px 0 3px; color:var(--txt); letter-spacing:-.01em}
+.print-hdr .ph-meta{font-size:12px; color:var(--mut)}
+@media print{
+  @page{ margin:12mm }
+  html,body{ background:#fff }
+  body::before{ display:none }
+  body *{ visibility:hidden }
+  #viewBudget, #viewBudget *{ visibility:visible }
+  #viewBudget{ position:absolute; left:0; top:0; width:100%; padding:0 2mm }
+  .btoolbar{ display:none !important }
+  .print-only{ display:block }
+  .print-hdr{ border-bottom:2.5px solid var(--deo); padding-bottom:10px; margin-bottom:16px }
+  *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important }
+  .bchart, .kpi, .insights, .evmmet, .risk-alert{ box-shadow:none !important; break-inside:avoid }
+  .bcharts{ grid-template-columns:1fr 1fr !important }
+  .kpirow{ grid-template-columns:repeat(5,1fr) !important }
+}
 
 .btable{background:var(--panel); backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); overflow:hidden; margin-bottom:14px}
 .bth{display:grid; grid-template-columns:1.6fr repeat(2,1fr); gap:10px; padding:12px 18px; background:var(--sec-bg); border-bottom:1px solid var(--line); font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--mut)}
@@ -2946,7 +2966,8 @@ function renderBudgetOverview(c,pct){
   const tbl=`<div class="bchart full"><h4>Variance analysis</h4><p class="csub">Estimate vs actual by category — positive variance is under budget</p>${varianceTable(cats,totalE,totalA)}</div>`;
   let limitNote="";
   if(lim){ const over=totalE>lim; limitNote=`<div class="blimit ${over?'over':'ok'}" style="margin-top:14px">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(totalE)} of ${money(lim)} cap set by admin${over?` (${money(totalE-lim)} over)`:''}.</div>`; }
-  return kpi + budgetInsights(c) + riskPanel() + hero + burndownChart() + charts + workloadPanel() + tbl + limitNote;
+  const printHdr=`<div class="print-only print-hdr"><div class="ph-eyebrow">Executive Budget &amp; Status Report</div><h1>${esc(cfg.project_name||cfg.title||"Project")}</h1><div class="ph-meta">${esc(cfg.class_name||cfg.title||"")}${cfg.semester?" · "+esc(cfg.semester):""}${cfg.group_label?" · "+esc(cfg.group_label):""} · Generated ${new Date().toLocaleDateString("en-US",{year:'numeric',month:'long',day:'numeric'})}</div></div>`;
+  return printHdr + kpi + budgetInsights(c) + riskPanel() + charts + tbl + hero + burndownChart() + workloadPanel() + limitNote;
 }
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
@@ -3213,6 +3234,13 @@ function exportCSV(){
   dlFile(csv, (cfg.project_name||cfg.title||"project").replace(/[^\w]+/g,"-").toLowerCase().replace(/^-|-$/g,"")+"-export-"+new Date().toISOString().slice(0,10)+".csv","text/csv;charset=utf-8");
   toast("CSV exported");
 }
+/* one-click board-ready report: the budget Overview, printed / saved as PDF */
+function exportExecReport(){
+  budgetView="overview"; localStorage.setItem("eh_bview","overview");
+  setView("budget"); renderBudget();
+  toast("Preparing report — choose “Save as PDF” in the print dialog");
+  setTimeout(()=>{ try{ window.print(); }catch(e){} }, 400);
+}
 function exportPDF(){
   const c=cfg, n=NW();
   const w=window.open("","_blank"); if(!w){ alert("Allow pop-ups to export the PDF."); return; }
@@ -3297,10 +3325,11 @@ $("#exportBtn").onclick=(e)=>{
   e.stopPropagation();
   let menu=$("#exportMenu"); if(menu){ menu.remove(); return; }
   menu=document.createElement("div"); menu.id="exportMenu"; menu.className="exmenu";
-  menu.innerHTML=`<button data-x="pdf">📄&nbsp; PDF — Progress + Budget</button><button data-x="csv">⤓&nbsp; CSV — tasks &amp; budget (spreadsheet)</button><button data-x="md">📝&nbsp; Markdown — for Obsidian</button>`;
+  menu.innerHTML=`<button data-x="exec">🖨&nbsp; Executive report — Budget dashboard (PDF)</button><button data-x="pdf">📄&nbsp; PDF — Progress + Budget</button><button data-x="csv">⤓&nbsp; CSV — tasks &amp; budget (spreadsheet)</button><button data-x="md">📝&nbsp; Markdown — for Obsidian</button>`;
   document.body.appendChild(menu);
   const r=$("#exportBtn").getBoundingClientRect();
-  menu.style.top=(r.bottom+6)+"px"; menu.style.left=Math.min(r.left,innerWidth-250)+"px";
+  menu.style.top=(r.bottom+6)+"px"; menu.style.left=Math.min(r.left,innerWidth-270)+"px";
+  menu.querySelector('[data-x="exec"]').onclick=()=>{menu.remove();exportExecReport();};
   menu.querySelector('[data-x="pdf"]').onclick=()=>{menu.remove();exportPDF();};
   menu.querySelector('[data-x="csv"]').onclick=()=>{menu.remove();exportCSV();};
   menu.querySelector('[data-x="md"]').onclick=()=>{menu.remove();exportMarkdown();};
