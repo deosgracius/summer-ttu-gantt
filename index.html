@@ -631,6 +631,25 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .evmleg span{display:inline-flex; align-items:center; gap:7px}
 .evmleg i{width:15px; height:4px; border-radius:2px; display:inline-block; flex:none}
 .evmchart-scroll{overflow-x:auto}
+/* auto-generated executive insights */
+.insights{background:linear-gradient(135deg,color-mix(in srgb,var(--deo) 9%,var(--panel)),var(--panel)); border:1px solid color-mix(in srgb,var(--deo) 26%,var(--line)); border-radius:var(--r); padding:15px 18px; margin-bottom:16px}
+.insights .ins-h{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:750; color:var(--txt); margin-bottom:10px}
+.insights .ins-ic{color:var(--deo); font-size:15px}
+.insights .ins-auto{margin-left:auto; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); background:var(--panel2); border:1px solid var(--line); padding:2px 9px; border-radius:20px}
+.insights ul{margin:0; padding-left:19px; display:flex; flex-direction:column; gap:7px}
+.insights li{font-size:13px; color:var(--txt2); line-height:1.5}
+.ins-good{color:var(--ok)} .ins-bad{color:var(--bad)}
+/* team workload & capacity */
+.wl-row{margin-bottom:0}
+.wl-nm{display:inline-flex; align-items:center; gap:7px; color:var(--txt2); font-weight:600}
+.wl-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; font-size:12.5px; gap:10px; flex-wrap:wrap}
+.wl-fig{color:var(--mut); font-variant-numeric:tabular-nums}
+.wl-fig b{color:var(--txt)}
+.wl-badge{font-size:10px; font-weight:700; padding:1px 8px; border-radius:20px; margin-left:6px}
+.wl-badge.over{background:color-mix(in srgb,var(--bad) 15%,transparent); color:var(--bad)}
+.wl-badge.ok{background:color-mix(in srgb,var(--ok) 15%,transparent); color:var(--ok)}
+.wl-badge.low{background:color-mix(in srgb,#fab219 18%,transparent); color:#b7791f}
+[data-theme="dark"] .wl-badge.low{color:#fab219}
 
 .btable{background:var(--panel); backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); overflow:hidden; margin-bottom:14px}
 .bth{display:grid; grid-template-columns:1.6fr repeat(2,1fr); gap:10px; padding:12px 18px; background:var(--sec-bg); border-bottom:1px solid var(--line); font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--mut)}
@@ -2807,6 +2826,33 @@ function evmChart(c){
   </div>`;
   return metrics+svg+leg;
 }
+/* auto-written executive narrative from the live numbers */
+function budgetInsights(c){
+  const pct=timePct(), used= c.totalE? c.totalA/c.totalE*100 : 0, nw=cfg.now_week||0;
+  const overdue=(tasks||[]).filter(t=>(+t.comp||0)<100 && t.w1<nw).length;
+  const done=(tasks||[]).filter(t=>(+t.comp||0)>=100).length, total=(tasks||[]).length;
+  const projected= pct>1? c.totalA/(pct/100) : c.totalE;
+  const L=[];
+  L.push(`You're <b>${Math.round(pct)}%</b> through the schedule with <b>${Math.round(used)}%</b> of the budget spent — ${used<pct-6?`<b class="ins-good">well under pace</b>`:used>pct+6?`<b class="ins-bad">ahead of pace</b> (watch spend)`:`in step with the plan`}.`);
+  L.push(total? `<b>${done}/${total}</b> tasks complete${overdue?`; <b class="ins-bad">${overdue}</b> ${overdue===1?'task is':'tasks are'} behind schedule and ${overdue===1?'needs':'need'} attention`:` — nothing is behind schedule`}.` : `No tasks yet — add some on the timeline.`);
+  L.push(`At the current burn rate the project is forecast to finish near <b>${money(projected)}</b> — ${projected<=c.totalE?`<b class="ins-good">${money(c.totalE-projected)} under</b>`:`<b class="ins-bad">${money(projected-c.totalE)} over</b>`} the <b>${money(c.totalE)}</b> estimate.`);
+  return `<div class="insights"><div class="ins-h"><span class="ins-ic">✦</span> Executive insights <span class="ins-auto">auto-generated</span></div><ul>${L.map(x=>`<li>${x}</li>`).join("")}</ul></div>`;
+}
+/* team workload & capacity — logged vs planned hours per member */
+function workloadPanel(){
+  const members=memberList(); if(!members.length) return "";
+  const sharedEst=(tasks||[]).filter(t=>ownerCanon(t.owner)==="Shared").reduce((s,t)=>s+num(t.est_hours),0);
+  const rows=members.map(m=>{ const own=(tasks||[]).filter(t=>ownerCanon(t.owner)===m);
+    const planned=own.reduce((s,t)=>s+num(t.est_hours),0)+sharedEst/members.length;
+    const logged=memberActualHours(m); return {name:m,planned,logged,util:planned?logged/planned:0,n:own.length}; });
+  const max=Math.max(1,...rows.map(r=>Math.max(r.planned,r.logged)));
+  const bars=rows.map(r=>{ const pw=Math.min(100,r.planned/max*100), lw=Math.min(100,r.logged/max*100), pctU=Math.round(r.util*100);
+    const badge= r.util>1.1?`<span class="wl-badge over">Over-allocated</span>` : r.util>=0.85?`<span class="wl-badge ok">On plan</span>` : `<span class="wl-badge low">Under-utilised</span>`;
+    return `<div class="wl-row"><div class="wl-top"><span class="wl-nm">${avatarHTML(r.name,20)} ${esc(r.name)}</span><span class="wl-fig"><b>${Math.round(r.logged*10)/10}</b> / ${Math.round(r.planned*10)/10} h · ${pctU}%${badge}</span></div>`+
+      `<div class="bl-track" title="${esc(r.name)}: ${Math.round(r.logged)}h logged of ${Math.round(r.planned)}h planned across ${r.n} tasks"><div class="bl-est" style="width:${pw}%"></div><div class="bl-act" style="width:${lw}%;background:${ownerColor(r.name)}"></div></div></div>`;
+  }).join("");
+  return `<div class="bchart full"><h4>Team workload &amp; capacity</h4><p class="csub">Logged vs planned hours per member — spot who is over- or under-allocated</p><div class="bullet">${bars}</div></div>`;
+}
 function renderBudgetOverview(c,pct){
   const cols=budgetCatColors();
   const cats=[
@@ -2840,7 +2886,7 @@ function renderBudgetOverview(c,pct){
   const tbl=`<div class="bchart full"><h4>Variance analysis</h4><p class="csub">Estimate vs actual by category — positive variance is under budget</p>${varianceTable(cats,totalE,totalA)}</div>`;
   let limitNote="";
   if(lim){ const over=totalE>lim; limitNote=`<div class="blimit ${over?'over':'ok'}" style="margin-top:14px">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(totalE)} of ${money(lim)} cap set by admin${over?` (${money(totalE-lim)} over)`:''}.</div>`; }
-  return kpi + hero + charts + tbl + limitNote;
+  return kpi + budgetInsights(c) + hero + charts + workloadPanel() + tbl + limitNote;
 }
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
@@ -3083,6 +3129,30 @@ function budgetHTML(){
     `<tr class="tt big"><td>Total Cost</td><td>${money(b.totalA)}</td><td>${money(b.totalE)}</td></tr>`);
   return h;
 }
+/* ---- CSV export (tasks + budget) ---- */
+function dlFile(text,filename,mime){ const blob=new Blob([text],{type:mime||"text/plain;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
+function csvCell(v){ v=(v==null?"":String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+function exportCSV(){
+  const c=calcBudget(); const wl=i=>(cfg.weeks&&cfg.weeks[i]&&cfg.weeks[i].label)||("W"+((+i||0)+1));
+  const R=[];
+  R.push(["Summer Timeline export", (cfg.project_name||cfg.title||"Project"), "generated", new Date().toISOString().slice(0,10)]);
+  R.push([]); R.push(["TASKS"]);
+  R.push(["Section","Task","Owner","Start","End","% complete","Est hours","Logged hours"]);
+  (tasks||[]).slice().sort((a,b)=>a.sort_order-b.sort_order).forEach(t=>R.push([t.section,t.name,ownerCanon(t.owner),wl(t.w0),wl(t.w1),(+t.comp||0),num(t.est_hours),num(t.logged_hours)]));
+  R.push([]); R.push(["BUDGET","Detail","Actual","Estimate"]);
+  (budget.labor||[]).forEach(r=>{ const isMem=memberList().includes(r.name), hA=isMem?memberActualHours(r.name):num(r.hrsA);
+    R.push(["Direct Labor · "+r.name, "$"+num(r.rate)+"/hr", num(r.rate)*hA, num(r.rate)*num(r.hrsE)]); });
+  (budget.contract||[]).forEach(r=>R.push(["Contract · "+r.name, "$"+num(r.rate)+"/hr", num(r.rate)*num(r.hrsA), num(r.rate)*num(r.hrsE)]));
+  (budget.material||[]).forEach(r=>R.push(["Materials · "+r.name, "", num(r.a), num(r.e)]));
+  (budget.rental||[]).forEach(r=>R.push(["Equipment · "+r.name, num(r.value)+" @ "+num(r.rate)+"%/day", "", c.ETRMexempt?0:num(r.value)*(num(r.rate)/100)*projectDays()]));
+  R.push(["Business overhead", Math.round(c.boh*100)+"%", c.bizA, c.bizE]);
+  R.push(["TOTAL COST","", c.totalA, c.totalE]);
+  const csv=R.map(row=>row.map(csvCell).join(",")).join("\r\n");
+  dlFile(csv, (cfg.project_name||cfg.title||"project").replace(/[^\w]+/g,"-").toLowerCase().replace(/^-|-$/g,"")+"-export-"+new Date().toISOString().slice(0,10)+".csv","text/csv;charset=utf-8");
+  toast("CSV exported");
+}
 function exportPDF(){
   const c=cfg, n=NW();
   const w=window.open("","_blank"); if(!w){ alert("Allow pop-ups to export the PDF."); return; }
@@ -3167,11 +3237,12 @@ $("#exportBtn").onclick=(e)=>{
   e.stopPropagation();
   let menu=$("#exportMenu"); if(menu){ menu.remove(); return; }
   menu=document.createElement("div"); menu.id="exportMenu"; menu.className="exmenu";
-  menu.innerHTML=`<button data-x="pdf">📄&nbsp; PDF — Progress + Budget</button><button data-x="md">📝&nbsp; Markdown — for Obsidian</button>`;
+  menu.innerHTML=`<button data-x="pdf">📄&nbsp; PDF — Progress + Budget</button><button data-x="csv">⤓&nbsp; CSV — tasks &amp; budget (spreadsheet)</button><button data-x="md">📝&nbsp; Markdown — for Obsidian</button>`;
   document.body.appendChild(menu);
   const r=$("#exportBtn").getBoundingClientRect();
   menu.style.top=(r.bottom+6)+"px"; menu.style.left=Math.min(r.left,innerWidth-250)+"px";
   menu.querySelector('[data-x="pdf"]').onclick=()=>{menu.remove();exportPDF();};
+  menu.querySelector('[data-x="csv"]').onclick=()=>{menu.remove();exportCSV();};
   menu.querySelector('[data-x="md"]').onclick=()=>{menu.remove();exportMarkdown();};
   setTimeout(()=>document.addEventListener("click",function h(){const mn=$("#exportMenu");if(mn)mn.remove();document.removeEventListener("click",h);},{once:true}),0);
 };
