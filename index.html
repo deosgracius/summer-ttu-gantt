@@ -1865,35 +1865,44 @@ function ensure3D(cb){ if(window.ForceGraph3D) return cb();
     (window.__l3d||[]).forEach(f=>f()); window.__l3d=null;
   }catch(e){ window.__l3d=null; toast("Couldn't load the 3D view (network)."); org3d=false;
     document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); } })(); }
-/* initials-badge avatar sprite (colored disc + white initials) */
-function avatar3DSprite(text,color,size){
-  const cvs=document.createElement("canvas"); cvs.width=cvs.height=128; const c=cvs.getContext("2d");
-  c.beginPath(); c.arc(64,64,58,0,Math.PI*2); c.fillStyle=color||"#888"; c.fill();
-  c.lineWidth=7; c.strokeStyle="rgba(255,255,255,.9)"; c.stroke();
-  c.fillStyle="#fff"; c.font="bold "+((text&&text.length>1)?52:62)+"px system-ui,-apple-system,sans-serif";
-  c.textAlign="center"; c.textBaseline="middle"; c.fillText(text||"", 64, 71);
-  const tex=new THREE.CanvasTexture(cvs); tex.anisotropy=4;
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false}));
-  sp.scale.set(size,size,1); return sp; }
-/* always-on 3D node = name label (+ initials avatar), theme-aware, like the Campus Assistant brain */
-function node3DObject(n){ if(!window.SpriteText) return null;
-  const grp=new THREE.Group();
-  // the brain always renders on a dark canvas, so labels are light in both themes.
-  // Only hubs (project/member/section) get an always-on label; tasks stay dots (name on hover)
-  // so the outer ring doesn't become an unreadable wall of overlapping text.
-  if(n.kind!=="task"){
-    const s=new SpriteText(n.name||"");
-    s.color="#eef2f7"; s.textHeight = n.kind==="center"?6.5 : n.kind==="owner"?5.4 : 4.6;
-    s.fontWeight="700"; s.backgroundColor=false; s.padding=0;
-    s.strokeColor="#0a0e17"; s.strokeWidth=1.1; s.material.depthWrite=false;
-    s.position.set(0, -(n.kind==="center"?12 : n.kind==="owner"?15 : 13), 0);
-    grp.add(s);
-  }
-  if(n.av){
-    if(n.kind==="owner"){ grp.add(avatar3DSprite(n.av, n.avColor||n.color, 18)); }                 // member = avatar disc
-    else if(n.kind==="task"){ const av=avatar3DSprite(n.av, n.avColor||n.color, 4.5); av.position.set(3.4,3.4,1); grp.add(av); } // small owner badge; status stays on the sphere
-  }
-  return grp; }
+/* ===== Campus-Assistant "Engineering Brain" node styling (ported from EngineeringBrain.tsx) ===== */
+let org3dFocus=null, org3dSel=null, org3dNeigh=new Map();
+const _colCtx=document.createElement("canvas").getContext("2d");
+function colA(color,a){ try{ _colCtx.fillStyle="#0a0e18"; _colCtx.fillStyle=color; const v=_colCtx.fillStyle;
+  if(v[0]==="#"){ const h=v.slice(1); return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`; }
+  const m=v.match(/rgba?\(([^)]+)\)/); if(m){ const p=m[1].split(",").map(s=>s.trim()); return `rgba(${p[0]},${p[1]},${p[2]},${a})`; }
+  return v; }catch(e){ return color; } }
+function sphereMesh(color,r){ return new THREE.Mesh(new THREE.SphereGeometry(r,16,16), new THREE.MeshLambertMaterial({color})); }
+function initialsTex(init,color){
+  const s=128,c=document.createElement("canvas"); c.width=c.height=s; const x=c.getContext("2d");
+  x.beginPath(); x.arc(s/2,s/2,s/2-6,0,7); x.closePath(); x.fillStyle="#1b2336"; x.fill();
+  x.fillStyle="#dbe4f5"; x.font="600 52px Inter, system-ui, sans-serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(init||"?",s/2,s/2+2);
+  x.lineWidth=9; x.strokeStyle=color||"#5b6b8c"; x.beginPath(); x.arc(s/2,s/2,s/2-5,0,7); x.stroke();
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t; }
+function txtSprite(text,fontPx,worldH){
+  const font=`600 ${fontPx}px Inter, system-ui, sans-serif`;
+  const meas=document.createElement("canvas").getContext("2d"); meas.font=font;
+  const pad=10, w=Math.ceil(meas.measureText(text).width);
+  const c=document.createElement("canvas"); c.width=w+pad*2; c.height=fontPx+pad*2;
+  const x=c.getContext("2d"); x.font=font; x.textAlign="center"; x.textBaseline="middle";
+  x.lineWidth=5; x.strokeStyle="rgba(7,11,20,0.9)"; x.strokeText(text,c.width/2,c.height/2);
+  x.fillStyle="#e9eefb"; x.fillText(text,c.width/2,c.height/2);
+  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthWrite:false,transparent:true}));
+  sp.scale.set(worldH*(c.width/c.height), worldH, 1); return sp; }
+/* root(cyan-ring) · hub(colour sphere) · member(avatar disc) · task(tiny dot, label hidden until focused) */
+function node3DObject(n){ if(!window.THREE) return null;
+  const g=new THREE.Group(); let half;
+  if(n.kind==="center"){ g.add(sphereMesh("#1f2937",17));
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(20,1.1,10,40), new THREE.MeshBasicMaterial({color:"#38bdf8"}))); half=20; }
+  else if(n.kind==="section"){ g.add(sphereMesh(n.color,12)); half=12; }
+  else if(n.kind==="owner"){ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:initialsTex(n.av,n.avColor||n.color),depthWrite:false})); sp.scale.set(11,11,1); g.add(sp); half=5.5; }
+  else { g.add(sphereMesh(n.color,2.8)); half=2.8; }                 // task leaf
+  const big=(n.kind==="center"||n.kind==="section"||n.kind==="owner");
+  const label=txtSprite(n.name||"", big?34:22, big?9:4.6);
+  label.position.set(0, -(half+(big?6:3)), 0);
+  if(n.kind==="task"){ label.visible=false; label.userData.leafLabel=true; }   // outer labels appear only on focus
+  g.add(label); return g; }
 /* ---- hierarchy + progressive disclosure (collapse/expand) — shared by 2D & 3D ---- */
 let orgExpanded = new Set();   // ids of nodes the user has opened; the centre is always open
 function orgTree(){
@@ -1948,21 +1957,22 @@ function orgEdgeColor(parent,child){
     if(child.kind==="section") return sectionColor(child.label);
   }
   return "var(--line-strong)"; }
-// fixed radial positions — generous rings, padded clusters, staggered leaves → clean & professional, not a cloud
+// deterministic concentric "second brain" layout (ported constants: R_HUB 140, R_MEM 320, R_LEAF 480, BASE 6, GAP 0.08)
 function orgLayoutPositions(){
-  const root=orgTree(), R=[0,140,320,500];
-  const rad=d=> d<R.length? R[d] : R[R.length-1]+(d-R.length+1)*190;
+  const root=orgTree(), R=[0,140,320,480,640], BASE=6;
+  const rad=d=> d<R.length? R[d] : R[R.length-1]+(d-R.length+1)*160;
   const leaves=node=>{ const c=orgVisKids(node); if(!c.length) return 1; return c.reduce((s,ch)=>s+leaves(ch),0); };
   const pos={};
   (function place(node,depth,a0,a1,idx){
     const ang=(a0+a1)/2 - Math.PI/2, isLeaf=orgVisKids(node).length===0;
-    const r=rad(depth) + (isLeaf && depth>=2 ? ((idx%2)? 30 : -8) : 0);   // stagger outer leaves so labels/avatars don't collide
+    const r=rad(depth) + (isLeaf && depth>=2 ? ((idx%2)? 48 : 0) : 0);   // stagger alternate leaves outward
     pos[node.id]={x:Math.cos(ang)*r, y:Math.sin(ang)*r};
     const c=orgVisKids(node); if(!c.length) return;
-    const tot=c.reduce((s,ch)=>s+leaves(ch),0)||1;
-    const gap=(depth===0?0.13:0.05), span=a1-a0, usable=span*(1-gap);   // reserve padding between sibling clusters
-    let a=a0+span*gap/2;
-    c.forEach((ch,i)=>{ const w=usable*leaves(ch)/tot; place(ch,depth+1,a,a+w,i); a+=w; });
+    // weight each branch by (leaf-count + BASE) so small branches still get room; GAP between top-level sectors
+    const wt=c.map(ch=>leaves(ch)+BASE), tot=wt.reduce((s,v)=>s+v,0)||1;
+    const GAP=0.08, span=a1-a0, usable=span - (depth===0? GAP*c.length : 0);
+    let a=a0 + (depth===0? GAP/2 : 0);
+    c.forEach((ch,i)=>{ const cw=usable*wt[i]/tot; place(ch,depth+1,a,a+cw,i); a += cw + (depth===0?GAP:0); });
   })(root,0,0,Math.PI*2,0);
   return pos; }
 function orgGraphData(){
@@ -1987,21 +1997,46 @@ function orgGraphData(){
   const pos=orgLayoutPositions();
   nodes.forEach(nd=>{ const p=pos[nd.id]; if(p){ nd.fx=p.x; nd.fy=p.y; nd.fz=0; } });
   return {nodes,links}; }
+function org3dEndId(e){ return (typeof e==="object")? e.id : e; }
+function org3dHot(l){ const f=org3dFocus; return !!f && (org3dEndId(l.source)===f || org3dEndId(l.target)===f); }
+function org3dApply(){ if(!org3dGraph) return; const data=orgGraphData();
+  org3dNeigh=new Map(); const addN=(a,b)=>{ if(!org3dNeigh.has(a)) org3dNeigh.set(a,new Set()); org3dNeigh.get(a).add(b); };
+  data.links.forEach(l=>{ addN(org3dEndId(l.source),org3dEndId(l.target)); addN(org3dEndId(l.target),org3dEndId(l.source)); });
+  org3dGraph.graphData(data); }
+function org3dHighlight(){ if(!org3dGraph) return;
+  org3dGraph.linkColor(org3dGraph.linkColor()).linkWidth(org3dGraph.linkWidth()).linkDirectionalParticles(org3dGraph.linkDirectionalParticles());
+  const f=org3dFocus, bright = f? new Set([f, ...(org3dNeigh.get(f)||[])]) : null;
+  org3dGraph.graphData().nodes.forEach(n=>{ const obj=n.__threeObj; if(!obj) return;
+    const op = (!bright || bright.has(n.id))? 1 : 0.12;
+    obj.traverse(o=>{ if(o.material){ o.material.transparent=true; o.material.opacity=op; }
+      if(o.userData && o.userData.leafLabel) o.visible = !!bright && bright.has(n.id); }); }); }
 function render3D(canvas){
   ensure3D(()=>{
     if(!org3d) return;
     if(!org3dGraph){ canvas.innerHTML="";
-      org3dGraph=ForceGraph3D()(canvas).backgroundColor("#0c1220").showNavInfo(true)
-        .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeOpacity(.95)
-        .nodeLabel(n=>n.hasKids? (n.name+(n.kind!=='center'?' — click to open':'')) : n.name)
-        .linkColor(l=>l.color).linkOpacity(l=>l.cp?.85:(l.dep?.5:.28)).linkWidth(l=>l.cp?1.6:(l.dep?0.5:0.35)).linkCurvature(l=>l.dep?0.18:0)
-        .linkDirectionalArrowLength(l=>l.dep?3.4:0).linkDirectionalArrowRelPos(1)
-        .onNodeClick(n=>{ if(n.kind==="task"){ if(n.tid) openTaskDrawer(n.tid); }
-          else if(n.hasKids){ orgToggle(n.nid); org3dGraph.graphData(orgGraphData()); } });
-      if(window.SpriteText) org3dGraph.nodeThreeObjectExtend(true).nodeThreeObject(node3DObject);
-      org3dGraph.__fit=false; }
-    org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600).graphData(orgGraphData());
-    if(!org3dGraph.__fit){ org3dGraph.__fit=true; setTimeout(()=>{ try{ org3dGraph.zoomToFit(600,60); }catch(e){} }, 450); }
+      org3dGraph=ForceGraph3D()(canvas).backgroundColor("#0a0e18").showNavInfo(true)
+        .cooldownTicks(0).nodeRelSize(5).nodeVal(n=>n.val).nodeColor(n=>n.color)
+        .nodeLabel(n=> n.kind==="task"? esc(n.name) : `<b>${esc(n.name)}</b>`)
+        .nodeThreeObjectExtend(false).nodeThreeObject(node3DObject)
+        .linkColor(l=>{ const base=l.color||"#5a6d94";
+          if(!org3dFocus) return colA(base, l.dep?0.6:(l.cp?0.9:0.3));
+          return org3dHot(l)? colA(base,1): colA(base,0.08); })
+        .linkWidth(l=> org3dHot(l)?2.2 : (l.cp?1.6:0.6))
+        .linkDirectionalParticles(l=> org3dHot(l)?3:0).linkDirectionalParticleWidth(2)
+        .linkDirectionalArrowLength(l=>l.dep?3:0).linkDirectionalArrowRelPos(1)
+        .onNodeHover(n=>{ canvas.style.cursor = n? "pointer":""; org3dFocus = n? n.id : org3dSel; org3dHighlight(); })
+        .onNodeClick(n=>{
+          if(n.kind==="task"){ if(n.tid){ org3dSel=n.id; openTaskDrawer(n.tid); } }
+          else if(n.hasKids){ orgToggle(n.nid); org3dApply(); }
+          org3dFocus=n.id; org3dHighlight();
+          try{ org3dGraph.cameraPosition({x:n.x,y:n.y,z:(n.z||0)+240},{x:n.x,y:n.y,z:n.z||0},700); }catch(e){} })
+        .onBackgroundClick(()=>{ org3dSel=null; org3dFocus=null; org3dHighlight(); });
+      org3dGraph.onEngineStop(()=>{ if(org3dGraph.__framed) return; org3dGraph.__framed=true;
+        try{ org3dGraph.cameraPosition({x:0,y:0,z:900},{x:0,y:0,z:0},0); org3dGraph.zoomToFit(600,60); }catch(e){} }); }
+    org3dGraph.width(canvas.clientWidth||800).height(canvas.clientHeight||600);
+    org3dApply();
+    if(!org3dGraph.__framed){ setTimeout(()=>{ if(org3dGraph.__framed) return; org3dGraph.__framed=true;
+      try{ org3dGraph.cameraPosition({x:0,y:0,z:900},{x:0,y:0,z:0},0); org3dGraph.zoomToFit(600,60); }catch(e){} }, 160); }
   }); }
 function orgExpandAll(){ orgExpanded.clear(); (function w(n){ if(orgHasKids(n)&&n.kind!=="center") orgExpanded.add(n.id); (n.children||[]).forEach(w); })(orgTree()); }
 function orgCollapseAll(){ orgExpanded.clear(); }
