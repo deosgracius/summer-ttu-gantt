@@ -664,6 +664,36 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .risk-main{flex:1; min-width:0}
 .risk-nm{font-size:13px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .risk-sub{font-size:11.5px; color:var(--mut); margin-top:1px}
+/* ===== AURA-style premium budget dashboard (hero + left rail) ===== */
+.aura{display:grid; grid-template-columns:300px 1fr; gap:16px; margin-bottom:18px}
+@media (max-width:900px){.aura{grid-template-columns:1fr}}
+.aura-rail{display:flex; flex-direction:column; gap:12px}
+.arcard{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); padding:13px 15px}
+.arcard .ar-h{display:flex; align-items:center; gap:7px; font-size:10.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--mut); margin-bottom:10px}
+.arcard .ar-h .ar-ic{color:var(--deo); font-size:12px}
+.ar-row{display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12.5px; padding:3px 0}
+.ar-row .arv{font-variant-numeric:tabular-nums; font-weight:700; color:var(--txt); flex:none}
+.ar-row .arn{color:var(--txt2); display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ar-dot{width:8px; height:8px; border-radius:50%; flex:none}
+.ar-mini{height:5px; border-radius:20px; background:var(--panel2); overflow:hidden; margin:2px 0 5px}
+.ar-mini i{display:block; height:100%; border-radius:20px}
+.aura-main{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); padding:20px 22px; min-width:0}
+.hero-eyebrow{display:flex; align-items:center; gap:8px; font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); flex-wrap:wrap}
+.hero-num{font-family:var(--mono); font-size:clamp(32px,5.5vw,54px); font-weight:750; letter-spacing:-.02em; color:var(--txt); margin:8px 0 2px; line-height:1}
+.hero-sub{display:flex; flex-wrap:wrap; gap:14px 26px; margin-top:14px}
+.hero-sub .hsk{font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--mut)}
+.hero-sub .hsv{font-family:var(--mono); font-size:17px; font-weight:700; color:var(--txt); margin-top:3px}
+.hero-sub .hsv.pos{color:var(--ok)} .hero-sub .hsv.neg{color:var(--bad)}
+.chiprow{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
+.bchip{display:inline-flex; align-items:center; gap:7px; padding:5px 12px; border-radius:20px; border:1px solid var(--line); background:var(--panel2); color:var(--txt2); font-size:12px; font-weight:600; cursor:pointer}
+.bchip.on{background:color-mix(in srgb,var(--deo) 16%,var(--panel-solid)); color:var(--txt); border-color:color-mix(in srgb,var(--deo) 45%,var(--line-strong))}
+.bchip .bchipv{color:var(--mut); font-variant-numeric:tabular-nums}
+.bchip.on .bchipv{color:var(--txt2)}
+.pillrow{display:inline-flex; gap:2px; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:3px; margin-bottom:12px; flex-wrap:wrap}
+.bpill{padding:5px 12px; border:0; background:transparent; color:var(--mut); font-size:12px; font-weight:600; border-radius:7px; cursor:pointer}
+.bpill.on{background:var(--panel-solid); color:var(--txt); box-shadow:inset 0 0 0 1px var(--line-strong)}
+.trendwrap{margin-top:18px}
+.hero-meth{font-size:10.5px; color:var(--mut); margin-top:14px; padding-top:12px; border-top:1px solid var(--grid-line); line-height:1.5}
 /* Executive report (print / Save-as-PDF of the budget Overview) */
 .print-only{display:none}
 .print-hdr .ph-eyebrow{font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--deo)}
@@ -2792,6 +2822,9 @@ function numCell(sec,idx,field,val,cls){ return editMode? inp(sec,idx,field,val,
 
 /* ===== BUDGET — business overview (KPIs, charts, variance) ===== */
 let budgetView = localStorage.getItem("eh_bview")||"overview";
+let budgetScope = "all", budgetRange = "full";   // AURA hero: scope (all/member) + trend window (full/phase)
+function donutGauge(pct,color){ const rr=30, C=2*Math.PI*rr, len=Math.min(100,Math.max(0,pct))/100*C;
+  return `<div style="display:flex;align-items:center;gap:12px"><svg viewBox="0 0 78 78" width="78" height="78" style="flex:none"><circle cx="39" cy="39" r="${rr}" fill="none" stroke="var(--panel2)" stroke-width="9"/><circle cx="39" cy="39" r="${rr}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${len.toFixed(1)} ${(C-len).toFixed(1)}" transform="rotate(-90 39 39)"/><text x="39" y="43" text-anchor="middle" style="fill:var(--txt);font-size:15px;font-weight:800;font-family:var(--mono)">${Math.round(pct)}%</text></svg><div style="font-size:11px;color:var(--txt2)">of budget<br>spent</div></div>`; }
 // validated 5-colour categorical palette (dataviz skill), stepped per theme
 function budgetCatColors(){ return (document.documentElement.getAttribute("data-theme")==="dark")
   ? ["#3987e5","#199e70","#c98500","#008300","#9085e9"]
@@ -2953,6 +2986,84 @@ function riskPanel(){
   const al=alerts.map(a=>`<div class="risk-alert ${a.sev}">${a.sev==='high'?'⚠':'●'} ${esc(a.txt)}</div>`).join("");
   return `<div class="bchart full"><h4>Risk register &amp; alerts</h4><p class="csub">Tasks and conditions that need attention, ranked by severity</p>${al?`<div class="risk-alerts">${al}</div>`:""}${rows?`<div class="risk-list">${rows}</div>`:`<p class="csub" style="color:var(--ok)">✓ No at-risk tasks.</p>`}</div>`;
 }
+/* AURA-style premium hero: big total + inline metrics + tap-to-scope chips + trend + left rail of metric cards */
+function renderBudgetHero(c,pct){
+  const totalE=c.totalE, totalA=c.totalA, remaining=Math.max(0,totalE-totalA), usedPct=totalE?totalA/totalE*100:0;
+  const projected= pct>1? totalA/(pct/100): totalE;
+  const N=Math.max(1,(cfg.weeks||[]).length), now=Math.max(0,Math.min(N-1,cfg.now_week||0));
+  const members=memberList(), cols=budgetCatColors();
+  const laborRate=o=>{ const L=budget.labor||[]; const line=L.find(r=>r.name===o); return line?num(line.rate):(L[0]?num(L[0].rate):12); };
+  const memberCost=m=> laborRate(m)*memberActualHours(m);
+  const wkCost=who=>{ const arr=new Array(N).fill(0);
+    (tasks||[]).forEach(t=>{ if(who && who!=="all" && ownerCanon(t.owner)!==who) return; const hbw=t.hours_by_week||{}, rate=laborRate(ownerCanon(t.owner));
+      Object.keys(hbw).forEach(w=>{ const i=+w; if(i>=0&&i<N) arr[i]+=num(hbw[w])*rate; }); }); return arr; };
+  const wall=wkCost("all"); let recent=0; for(let i=Math.max(0,now-3);i<=now;i++) recent+=wall[i];
+  const scopeAll = budgetScope==="all" || !members.includes(budgetScope);
+  if(!scopeAll && !members.includes(budgetScope)) budgetScope="all";
+  const scopedActual = scopeAll? totalA : memberCost(budgetScope);
+  const date=fmtDate(budget.today||liveToday());
+  // ----- left rail -----
+  const catsR=[["Direct Labor",c.TDLa,cols[0]],["Contract",c.TCLa,cols[1]],["Materials",c.TDMa,cols[2]],["Equipment",c.ETRMa,cols[3]],["Overhead",c.bizA,cols[4]]];
+  const catMax=Math.max(1,...catsR.map(x=>x[1]));
+  const catBars=catsR.map(([nm,v,col])=>`<div class="ar-row"><span class="arn"><span class="ar-dot" style="background:${col}"></span>${nm}</span><span class="arv">${money(v)}</span></div><div class="ar-mini"><i style="width:${Math.round(v/catMax*100)}%;background:${col}"></i></div>`).join("");
+  const gauge=donutGauge(Math.min(100,usedPct), usedPct>pct+6?'var(--bad)':'var(--deo)');
+  const memRows=members.map(m=>({m,cost:memberCost(m)})).filter(x=>x.cost>0).sort((a,b)=>b.cost-a.cost);
+  const memTotal=Math.max(1,memRows.reduce((s,x)=>s+x.cost,0));
+  const memDonut=memRows.length? donutChart(memRows.map((x,i)=>({name:x.m,e:x.cost,col:cols[i%cols.length]})), memTotal) : `<div class="csub" style="color:var(--mut)">No logged labor yet.</div>`;
+  const memList=memRows.map(x=>`<div class="ar-row"><span class="arn">${avatarHTML(x.m,18)} ${esc(x.m)}</span><span class="arv">${money(x.cost)}</span></div>`).join("");
+  const weeksLeft=Math.max(0,N-1-now);
+  const rail=`<div class="aura-rail">
+    <div class="arcard"><div class="ar-h"><span class="ar-ic">▤</span> Budget summary</div>
+      <div class="ar-row"><span class="arn">Estimate</span><span class="arv">${money(totalE)}</span></div>
+      <div class="ar-row"><span class="arn">Actual to date</span><span class="arv" style="color:var(--ok)">${money(totalA)}</span></div>
+      <div class="ar-row"><span class="arn">Remaining</span><span class="arv">${money(remaining)}</span></div></div>
+    <div class="arcard"><div class="ar-h"><span class="ar-ic">◔</span> Utilization</div>${gauge}<div style="font-size:10.5px;color:var(--mut);margin-top:9px">actual ÷ estimate · ${Math.round(pct)}% of time elapsed</div></div>
+    <div class="arcard"><div class="ar-h"><span class="ar-ic">▦</span> Cost by category</div>${catBars}</div>
+    <div class="arcard"><div class="ar-h"><span class="ar-ic">◕</span> Cost by member</div>${memDonut}<div style="margin-top:8px">${memList}</div></div>
+    <div class="arcard"><div class="ar-h"><span class="ar-ic">◷</span> Remaining &amp; runway</div>
+      <div class="ar-row"><span class="arn">Budget left</span><span class="arv">${money(remaining)}</span></div>
+      <div class="ar-row"><span class="arn">Weeks left</span><span class="arv">${weeksLeft}</span></div>
+      <div class="ar-row"><span class="arn">Projected final</span><span class="arv" style="color:${projected<=totalE?'var(--ok)':'var(--bad)'}">${money(projected)}</span></div></div>
+  </div>`;
+  // ----- trend (single clean line, scoped + windowed) -----
+  function costTrend(){
+    const dark=document.documentElement.getAttribute("data-theme")==="dark", cLine=dark?"#3987e5":"#2a78d6";
+    const raw=wkCost(scopeAll?"all":budgetScope); let cum=[],r=0; for(let i=0;i<N;i++){ r+=raw[i]; cum.push(r); }
+    const endTarget=scopedActual, cumNow=cum[now]||0, scl=cumNow>0? endTarget/cumNow:0;
+    const A=cum.map(v=> cumNow>0? v*scl : 0);
+    let lo=0, hi=N-1;
+    if(budgetRange!=="full"){ const p=+budgetRange.slice(1), per=N/3; lo=Math.floor(p*per); hi=Math.min(N-1,Math.max(lo+1,Math.floor((p+1)*per))); }
+    const yMax=(Math.max(1,...A))*1.12, W=760,H=250,padL=54,padR=14,padT=16,padB=32, span=Math.max(1,hi-lo);
+    const px=w=> padL+((w-lo)/span)*(W-padL-padR), py=v=> H-padB-(v/yMax)*(H-padT-padB);
+    let grid=""; for(let i=0;i<=3;i++){ const v=yMax*i/3,y=py(v); grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--grid-line)" stroke-width="1"/><text x="${padL-8}" y="${(y+3).toFixed(1)}" text-anchor="end" style="fill:var(--mut);font-size:9px;font-family:var(--mono)">${money(v).replace('.00','')}</text>`; }
+    let xlab=""; const stp=Math.max(1,Math.ceil(span/6)); for(let w=lo;w<=hi;w+=stp){ xlab+=`<text x="${px(w).toFixed(1)}" y="${H-padB+15}" text-anchor="middle" style="fill:var(--mut);font-size:9px">${esc((cfg.weeks[w]||{}).label||('W'+(w+1)))}</text>`; }
+    const pts=[]; for(let w=lo;w<=hi;w++) pts.push([px(w),py(A[w])]);
+    const line=pts.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+    const area=`${line} L${px(hi).toFixed(1)},${py(0).toFixed(1)} L${px(lo).toFixed(1)},${py(0).toFixed(1)} Z`;
+    const nn= now>=lo&&now<=hi;
+    const marker= nn? `<circle cx="${px(now).toFixed(1)}" cy="${py(A[now]).toFixed(1)}" r="4" fill="${cLine}" stroke="var(--panel-solid)" stroke-width="2"/><text x="${px(now).toFixed(1)}" y="${(py(A[now])-9).toFixed(1)}" text-anchor="middle" style="fill:var(--txt);font-size:10px;font-weight:800;font-family:var(--mono)">+${money(recent).replace('.00','')}</text>`:"";
+    return `<div class="evmchart-scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:520px;display:block" role="img" aria-label="Cost trend">${grid}${xlab}<path d="${area}" fill="${cLine}" fill-opacity="0.10"/><path d="${line}" fill="none" stroke="${cLine}" stroke-width="2.4"/>${marker}</svg></div>`;
+  }
+  const chips=[["all","All budget",totalA]].concat(members.map(m=>[m,m,memberCost(m)]))
+    .map(([id,label,val])=>`<button class="bchip ${budgetScope===id?'on':''}" data-bscope="${esc(id)}">${esc(label)} <span class="bchipv">${money(val)}</span></button>`).join("");
+  const phases=[["full","Full run"],["p0","Phase 1"],["p1","Phase 2"],["p2","Phase 3"]]
+    .map(([id,label])=>`<button class="bpill ${budgetRange===id?'on':''}" data-brange="${id}">${label}</button>`).join("");
+  const heroTitle=scopeAll?"Total budget":(esc(budgetScope)+" · labor cost");
+  const main=`<div class="aura-main">
+    <div class="hero-eyebrow"><span style="color:var(--deo)">◆</span> ${heroTitle} <span style="color:var(--mut);font-weight:600;text-transform:none;letter-spacing:0">as of ${date}</span></div>
+    <div class="hero-num">${scopeAll?money(totalE):money(scopedActual)}</div>
+    <div class="hero-sub">
+      <div class="hs"><div class="hsk">Actual</div><div class="hsv">${money(scopeAll?totalA:scopedActual)}</div></div>
+      <div class="hs"><div class="hsk">${scopeAll?'Remaining':'Hours logged'}</div><div class="hsv">${scopeAll?money(remaining):(Math.round(memberActualHours(budgetScope)*10)/10+'h')}</div></div>
+      <div class="hs"><div class="hsk">Used</div><div class="hsv">${Math.round(usedPct)}%</div></div>
+      <div class="hs"><div class="hsk">Recent spend</div><div class="hsv pos">+${money(recent)}</div></div>
+    </div>
+    <div class="chiprow">${chips}</div>
+    <div class="trendwrap"><div class="pillrow">${phases}</div>${costTrend()}</div>
+    <div class="hero-meth">Methodology · actual cost = per-week logged hours × rate, accumulated · projection = linear burn (actual ÷ time elapsed) · tap a chip to scope to a member.</div>
+  </div>`;
+  return `<div class="aura">${rail}${main}</div>`;
+}
 function renderBudgetOverview(c,pct){
   const cols=budgetCatColors();
   const cats=[
@@ -2968,14 +3079,6 @@ function renderBudgetOverview(c,pct){
   const variance = totalE - projected;                    // + = under budget
   const overPace = usedPct > pct+6;
   const lim = +cfg.budget_limit||0;
-  const pill=(cls,txt)=>`<span class="kpill ${cls}">${txt}</span>`;
-  const kpi=`<div class="kpirow">
-    <div class="kpi" style="--kpi-accent:${cols[0]}"><div class="kk">Total estimate</div><div class="kv">${money(totalE)}</div><div class="ks">${cats.filter(x=>x.e>0).length} cost categories</div></div>
-    <div class="kpi" style="--kpi-accent:var(--ok)"><div class="kk">Actual to date</div><div class="kv">${money(totalA)}</div><div class="ks">${Math.round(usedPct)}% of estimate used</div></div>
-    <div class="kpi" style="--kpi-accent:var(--can)"><div class="kk">Remaining</div><div class="kv">${money(remaining)}</div><div class="ks">of ${money(totalE)} budget</div></div>
-    <div class="kpi" style="--kpi-accent:${overPace?'var(--bad)':'var(--ok)'}"><div class="kk">Projected final</div><div class="kv">${money(projected)}</div><div class="ks">at current burn ${variance>=0?pill('good','▲ '+money(Math.abs(variance))+' under'):pill('bad','▼ '+money(Math.abs(variance))+' over')}</div></div>
-    <div class="kpi" style="--kpi-accent:${overPace?'#fab219':'var(--ok)'}"><div class="kk">Budget health</div><div class="kv" style="font-size:20px">${overPace?'Watch pace':'On track'}</div><div class="ks">${Math.round(usedPct)}% spent vs ${Math.round(pct)}% time elapsed</div></div>
-  </div>`;
   const hero=`<div class="bchart full"><h4>Cost vs schedule — earned-value view</h4><p class="csub">Money spent, planned budget, and value of work done across the ${(cfg.weeks||[]).length}-week schedule</p>${evmChart(c)}</div>`;
   const charts=`<div class="bcharts">
     <div class="bchart"><h4>Actual vs estimate by category</h4><p class="csub">Solid = spent · hatched = estimated · red tick = over</p>${bulletChart(cats)}</div>
@@ -2987,7 +3090,7 @@ function renderBudgetOverview(c,pct){
   let limitNote="";
   if(lim){ const over=totalE>lim; limitNote=`<div class="blimit ${over?'over':'ok'}" style="margin-top:14px">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(totalE)} of ${money(lim)} cap set by admin${over?` (${money(totalE-lim)} over)`:''}.</div>`; }
   const printHdr=`<div class="print-only print-hdr"><div class="ph-eyebrow">Executive Budget &amp; Status Report</div><h1>${esc(cfg.project_name||cfg.title||"Project")}</h1><div class="ph-meta">${esc(cfg.class_name||cfg.title||"")}${cfg.semester?" · "+esc(cfg.semester):""}${cfg.group_label?" · "+esc(cfg.group_label):""} · Generated ${new Date().toLocaleDateString("en-US",{year:'numeric',month:'long',day:'numeric'})}</div></div>`;
-  return printHdr + kpi + budgetInsights(c) + riskPanel() + charts + tbl + hero + burndownChart() + workloadPanel() + limitNote;
+  return printHdr + renderBudgetHero(c,pct) + budgetInsights(c) + riskPanel() + charts + tbl + hero + burndownChart() + workloadPanel() + limitNote;
 }
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
@@ -3124,6 +3227,8 @@ $("#viewBudget").addEventListener("change",ev=>{
 $("#viewBudget").addEventListener("click",ev=>{
   const bv=ev.target.closest("[data-bview]");
   if(bv){ budgetView=bv.dataset.bview; localStorage.setItem("eh_bview",budgetView); renderBudget(); return; }
+  const bs=ev.target.closest("[data-bscope]"); if(bs){ budgetScope=bs.dataset.bscope; renderBudget(); return; }
+  const br=ev.target.closest("[data-brange]"); if(br){ budgetRange=br.dataset.brange; renderBudget(); return; }
   const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]");
   if(add){ const s=add.dataset.add; if(!budget[s])budget[s]=[];
     const def={labor:{name:"New role",rate:12,hrsA:0,hrsE:0},contract:{name:"New contractor",rate:0,hrsA:0,hrsE:0},
