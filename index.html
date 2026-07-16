@@ -1828,8 +1828,8 @@ function orgMatch(t){
   return true; }
 /* sidebar status filter (the "Organisation Brain" left panel) */
 let orgStatus=null;   // null | 'done' | 'progress' | 'behind' | 'next'
-function orgStatusKey(t){ const c=+t.comp||0; if(c>=100) return "done";
-  if(t.w1<cfg.now_week) return "behind"; if(t.w0<=cfg.now_week && cfg.now_week<=t.w1) return "progress"; return "next"; }
+function orgStatusKey(t){ const c=+t.comp||0; if(c>=100) return "done";   // green
+  if(t.w1<cfg.now_week) return "behind"; return "good"; }                  // red = late · yellow = good standing
 function orgTaskShown(t){ return orgMatch(t) && (!orgStatus || orgStatusKey(t)===orgStatus); }
 /* ---- dependencies & critical path ---- */
 let orgDeps=false;
@@ -1878,17 +1878,20 @@ function avatar3DSprite(text,color,size){
 /* always-on 3D node = name label (+ initials avatar), theme-aware, like the Campus Assistant brain */
 function node3DObject(n){ if(!window.SpriteText) return null;
   const grp=new THREE.Group();
-  const hubCol=cssColor("var(--txt)")||"#e5e7eb", taskCol=cssColor("var(--txt2)")||"#9aa4b2", halo=cssColor("var(--panel-solid)")||"#0b1020";
-  const s=new SpriteText(n.name||"");
-  s.color = (n.kind==="task")? taskCol : hubCol;
-  s.textHeight = n.kind==="center"?6.5 : n.kind==="owner"?5 : n.kind==="section"?4.6 : 2.6;
-  s.fontWeight=(n.kind==="task")?"400":"700"; s.backgroundColor=false; s.padding=0;
-  s.strokeColor=halo; s.strokeWidth=(n.kind==="task")?0.6:1; s.material.depthWrite=false;
-  s.position.set(0, -(n.kind==="center"?12 : n.kind==="owner"?14 : n.kind==="section"?13 : 7), 0);   // label sits below the node
-  grp.add(s);
+  // the brain always renders on a dark canvas, so labels are light in both themes.
+  // Only hubs (project/member/section) get an always-on label; tasks stay dots (name on hover)
+  // so the outer ring doesn't become an unreadable wall of overlapping text.
+  if(n.kind!=="task"){
+    const s=new SpriteText(n.name||"");
+    s.color="#eef2f7"; s.textHeight = n.kind==="center"?6.5 : n.kind==="owner"?5.4 : 4.6;
+    s.fontWeight="700"; s.backgroundColor=false; s.padding=0;
+    s.strokeColor="#0a0e17"; s.strokeWidth=1.1; s.material.depthWrite=false;
+    s.position.set(0, -(n.kind==="center"?12 : n.kind==="owner"?15 : 13), 0);
+    grp.add(s);
+  }
   if(n.av){
-    if(n.kind==="owner"){ grp.add(avatar3DSprite(n.av, n.avColor||n.color, 18)); }              // member = avatar disc
-    else if(n.kind==="task"){ const av=avatar3DSprite(n.av, n.avColor||n.color, 5); av.position.set(3.6,3.6,1); grp.add(av); } // small owner badge on the task
+    if(n.kind==="owner"){ grp.add(avatar3DSprite(n.av, n.avColor||n.color, 18)); }                 // member = avatar disc
+    else if(n.kind==="task"){ const av=avatar3DSprite(n.av, n.avColor||n.color, 4.5); av.position.set(3.4,3.4,1); grp.add(av); } // small owner badge; status stays on the sphere
   }
   return grp; }
 /* ---- hierarchy + progressive disclosure (collapse/expand) — shared by 2D & 3D ---- */
@@ -1929,12 +1932,17 @@ function orgToggle(id){
     [...orgExpanded].forEach(x=>{ if(x.startsWith(id+"|")) orgExpanded.delete(x); }); }
   else orgExpanded.add(id);
 }
+/* 3-state task colour for the brain: green = complete · yellow = good standing · red = late */
+function orgTaskColor(t){ const sc=statusColors(); const c=+t.comp||0;
+  if(c>=100) return sc.done;                 // green — complete
+  if(t.w1 < cfg.now_week) return sc.behind;  // red — late (past its end week, not done)
+  return sc.progress; }                       // yellow — good standing (in progress or upcoming)
 function orgNodeFill(n){ return n.kind==="center"?"var(--deo)"
   : n.kind==="owner"? ownerColor(n.owner)
   : n.kind==="section"? (orgColorBy==="owner"? ownerColor(n.owner) : sectionColor(n.label))
-  : taskStatusColor(n.task); }
+  : orgTaskColor(n.task); }
 function orgEdgeColor(parent,child){
-  if(child.kind==="task") return taskStatusColor(child.task);
+  if(child.kind==="task") return orgTaskColor(child.task);
   if(child.kind==="owner"||child.kind==="section"){
     if(orgColorBy==="owner") return ownerColor(child.owner||parent.owner);
     if(child.kind==="section") return sectionColor(child.label);
@@ -1964,7 +1972,7 @@ function orgGraphData(){
       name: node.kind==="task"? (node.label+" · "+(node.task.comp||0)+"%")
            : (node.label + (orgHasKids(node)&&!orgIsOpen(node)? "  (+"+node.children.length+")":"")),
       color: (node.kind==="task" && !orgTaskShown(node.task))? "#3a3f4a" : cssColor(orgNodeFill(node)),
-      val: node.kind==="center"?7 : node.kind==="owner"?11 : node.kind==="section"?9 : 2+(+node.task.comp||0)/40,
+      val: node.kind==="center"?7 : node.kind==="owner"?11 : node.kind==="section"?9 : 3.4+(+node.task.comp||0)/60,
       tid: node.kind==="task"? node.task.id : null, hasKids: orgHasKids(node),
       av: node.kind==="owner"? initials(node.label) : node.kind==="task"? initials(ownerCanon(node.task.owner)) : null,
       avColor: node.kind==="owner"? cssColor(ownerColor(node.label)) : node.kind==="task"? cssColor(ownerColor(node.task.owner)) : null });
@@ -1983,7 +1991,7 @@ function render3D(canvas){
   ensure3D(()=>{
     if(!org3d) return;
     if(!org3dGraph){ canvas.innerHTML="";
-      org3dGraph=ForceGraph3D()(canvas).backgroundColor("rgba(0,0,0,0)").showNavInfo(true)
+      org3dGraph=ForceGraph3D()(canvas).backgroundColor("#0c1220").showNavInfo(true)
         .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeOpacity(.95)
         .nodeLabel(n=>n.hasKids? (n.name+(n.kind!=='center'?' — click to open':'')) : n.name)
         .linkColor(l=>l.color).linkOpacity(l=>l.cp?.85:(l.dep?.5:.28)).linkWidth(l=>l.cp?1.6:(l.dep?0.5:0.35)).linkCurvature(l=>l.dep?0.18:0)
@@ -1998,7 +2006,7 @@ function render3D(canvas){
 function orgExpandAll(){ orgExpanded.clear(); (function w(n){ if(orgHasKids(n)&&n.kind!=="center") orgExpanded.add(n.id); (n.children||[]).forEach(w); })(orgTree()); }
 function orgCollapseAll(){ orgExpanded.clear(); }
 function renderOrgSide(){ const el=$("#orgside"); if(!el) return;
-  const all=tasks||[], sc=statusColors(); const st={done:0,progress:0,behind:0,next:0};
+  const all=tasks||[], sc=statusColors(); const st={done:0,good:0,behind:0};
   all.forEach(t=>{ st[orgStatusKey(t)]++; });
   const members=ownerList().filter(o=>all.some(t=>ownerCanon(t.owner)===o)).length;
   const sections=sectionsOf(all).length, owner=(orgColorBy==="owner");
@@ -2011,10 +2019,9 @@ function renderOrgSide(){ const el=$("#orgside"); if(!el) return;
     typeRow("#94a3b8","Sections",sections)+
     typeRow(sc.progress,"Tasks",all.length)+
     `<div class="osgroup">Status — click to filter</div>`+
-    statRow("done",sc.done,"Done",st.done)+
-    statRow("progress",sc.progress,"In progress",st.progress)+
-    statRow("behind",sc.behind,"Behind",st.behind)+
-    statRow("next",sc.next,"Upcoming",st.next);
+    statRow("done",sc.done,"Complete",st.done)+
+    statRow("good",sc.progress,"Good standing",st.good)+
+    statRow("behind",sc.behind,"Late",st.behind);
   el.querySelectorAll(".osrow.clk").forEach(b=> b.onclick=()=>{ const was=(orgStatus===b.dataset.st);
     orgStatus = was? null : b.dataset.st; if(!was) orgExpandAll();
     if(org3d && org3dGraph){ org3dGraph.graphData(orgGraphData()); renderOrgSide(); } else renderOrg(); });
@@ -2023,7 +2030,7 @@ function renderOrgSide(){ const el=$("#orgside"); if(!el) return;
 }
 function renderOrgLegend(byOwner){ const el=$("#orglegend"); if(!el) return; const sc=statusColors();
   const dot=(c,l)=>`<span class="lg"><span class="sw" style="background:${c}"></span>${l}</span>`;
-  let h=dot(sc.done,"Done")+dot(sc.progress,"In progress")+dot(sc.behind,"Behind")+dot(sc.next,"Upcoming");
+  let h=dot(sc.done,"Complete")+dot(sc.progress,"Good standing")+dot(sc.behind,"Late");
   h+=`<span class="lgsep">·</span><span class="lg">node = status</span>`;
   if(byOwner) h+=`<span class="lgsep">·</span><span class="lg"><span class="swl"></span>line = member</span>`;
   if(orgDeps) h+=`<span class="lgsep">·</span><span class="lg"><span class="swl" style="border-top-style:dashed;border-color:#94a3b8"></span>depends on</span>`
@@ -2470,9 +2477,7 @@ function setTheme(t){document.documentElement.setAttribute("data-theme",t);local
     ? '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Light'
     : '<svg viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> Dark';
   $("#themeBtn").innerHTML = html; const at=$("#adminThemeBtn"); if(at) at.innerHTML = html;
-  if(typeof placeOverlay==="function"&&$("#grid").children.length)placeOverlay();
-  // 3D labels/avatars bake theme colours at build time — rebuild so they follow the new theme
-  if(typeof org3d!=="undefined" && org3d && typeof teardown3D==="function"){ teardown3D(); if(typeof renderOrg==="function") renderOrg(); } }
+  if(typeof placeOverlay==="function"&&$("#grid").children.length)placeOverlay(); }
 $("#themeBtn").onclick=()=>setTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
 setTheme(localStorage.getItem("eh_theme")||"dark");
 
