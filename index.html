@@ -272,7 +272,16 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .orow .pc{width:34px; text-align:right; color:var(--mut); font-weight:700; font-size:11px}
 /* ===== Organization (graph) view ===== */
 .orgwrap{border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--panel); box-shadow:var(--card-shadow); position:relative}
-.orgbar{display:flex; align-items:center; gap:14px; padding:10px 14px; border-bottom:1px solid var(--line)}
+.orgbar{display:flex; align-items:center; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+/* iOS-style segmented controls (Summer Engineering-Brain style) */
+.seg{display:inline-flex; align-items:center; gap:2px; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:3px}
+.seg-btn{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border:0; background:transparent; color:var(--mut); font-size:13px; font-weight:600; border-radius:7px; cursor:pointer; transition:background .15s,color .15s; white-space:nowrap}
+.seg-btn:hover{color:var(--txt2)}
+.seg-btn.on{background:var(--panel-solid); color:var(--txt); box-shadow:0 1px 2px rgba(0,0,0,.18), inset 0 0 0 1px var(--line-strong)}
+.seg-btn svg{width:15px; height:15px; flex:none}
+.segdiv{width:1px; height:22px; background:var(--line)}
+.orggraphctl{display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap}
+.orgbtn.on{background:color-mix(in srgb,var(--deo) 14%,var(--panel-solid)); color:var(--txt); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 42%,var(--line-strong))}
 .orgtog,.dimtog{padding:6px 12px; border-radius:7px; font-size:12px; font-weight:600; background:transparent; color:var(--mut); border:0; cursor:pointer}
 .orgtog.on,.dimtog.on{background:color-mix(in srgb,var(--deo) 13%,var(--panel-solid)); color:var(--txt); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 42%,var(--line-strong))}
 .orghint{margin-left:auto; font-size:11px; color:var(--faint)}
@@ -1002,7 +1011,6 @@ input:focus-visible,select:focus-visible{outline:none}
     <div class="vtoggle">
       <button class="vtab" data-tl="detailed" type="button">Detailed</button>
       <button class="vtab" data-tl="progress" type="button">Progress</button>
-      <button class="vtab" data-tl="model" type="button">Model</button>
       <button class="vtab" data-tl="org" type="button">Organization</button>
     </div>
     <div class="search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -1019,27 +1027,33 @@ input:focus-visible,select:focus-visible{outline:none}
 
   <div class="orgwrap" id="orgview" style="display:none">
     <div class="orgbar">
-      <div class="vtoggle" style="margin:0">
-        <button class="orgtog on" data-org="status" type="button">By status</button>
-        <button class="orgtog" data-org="owner" type="button">By owner</button>
+      <div class="seg" role="tablist" aria-label="Organization view">
+        <button class="seg-btn on" data-orgmode="graph" type="button"><svg viewBox="0 0 24 24" fill="none"><circle cx="5" cy="6" r="2.2" stroke="currentColor" stroke-width="2"/><circle cx="19" cy="6" r="2.2" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="18" r="2.2" stroke="currentColor" stroke-width="2"/><path d="M7 7l4 9M17 7l-4 9" stroke="currentColor" stroke-width="2"/></svg> Graph</button>
+        <button class="seg-btn" data-orgmode="board" type="button"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg> Board</button>
       </div>
-      <div class="vtoggle" style="margin:0">
-        <button class="dimtog on" data-dim="2d" type="button">2D</button>
-        <button class="dimtog" data-dim="3d" type="button">3D</button>
+      <span class="segdiv"></span>
+      <div class="orggraphctl" id="orggraphctl">
+        <div class="seg">
+          <button class="seg-btn on" data-org="status" type="button">By status</button>
+          <button class="seg-btn" data-org="owner" type="button">By owner</button>
+        </div>
+        <div class="seg">
+          <button class="seg-btn on" data-dim="2d" type="button">2D</button>
+          <button class="seg-btn" data-dim="3d" type="button">3D</button>
+        </div>
+        <button class="orgbtn deptog" id="orgDeps" type="button" title="Show task dependencies & critical path">⛓ Dependencies</button>
+        <button class="orgbtn" id="orgReset" type="button" title="Reset view">↺ Reset</button>
+        <button class="orgbtn" id="orgFull" type="button" title="Toggle full screen">⛶ Full screen</button>
       </div>
-      <button class="orgtog deptog" id="orgDeps" type="button" title="Show task dependencies & critical path">⛓ Dependencies</button>
-      <button class="orgbtn" id="orgReset" type="button" title="Reset view">↺ Reset</button>
-      <span class="orghint">Click a node to open its branch · badge shows hidden count · click a task to edit</span>
-      <button class="orgbtn" id="orgFull" type="button" title="Toggle full screen">⛶ Full screen</button>
+      <span class="orghint" id="orghint">Click a node to open its branch · click a task to edit</span>
     </div>
-    <div class="orgmain">
+    <div class="orgmain" id="orgmain">
       <div class="orgside" id="orgside"></div>
       <div class="orgcanvas" id="orgcanvas"></div>
     </div>
     <div class="orglegend" id="orglegend" style="display:none"></div>
+    <div id="orgboard" style="display:none"></div>
   </div>
-
-  <div id="modelview" style="display:none"></div>
   </div><!-- /viewTimeline -->
 
   <div id="viewBudget" style="display:none"></div>
@@ -1860,15 +1874,29 @@ function renderLegend(){
   $("#statusLegend").innerHTML = [["Done",sc.done],["Behind",sc.behind],["In progress",sc.progress],["Next",sc.next]]
     .map(([l,c])=>`<b><span class="d" style="background:${c}"></span>${l}</b>`).join("");
 }
-function setTimelineView(v){ timelineView=v; localStorage.setItem("eh_tlview",v);
+let orgMode = localStorage.getItem("eh_orgmode")||"graph";   // graph | board (Summer-style view toggle)
+function setTimelineView(v){ if(v==="model"){ v="org"; orgMode="board"; localStorage.setItem("eh_orgmode","board"); }
+  timelineView=v; localStorage.setItem("eh_tlview",v);
   document.querySelectorAll(".vtab").forEach(b=>b.classList.toggle("active",b.dataset.tl===v));
-  const org=(v==="org"), model=(v==="model"), grid=!org&&!model;
+  const org=(v==="org"), grid=!org;
   const gw=$(".gwrap"); if(gw) gw.style.display=grid?"":"none";
   const ov=$("#orgview"); if(ov) ov.style.display=org?"":"none";
-  const mv=$("#modelview"); if(mv) mv.style.display=model?"":"none";
   if(!org) teardown3D();
-  renderLegend(); if(org) renderOrg(); else if(model) renderModel(); else renderGrid(); }
+  renderLegend(); if(org) renderOrgArea(); else renderGrid(); }
+// Graph vs Board mode inside the Organization view
+function renderOrgArea(){
+  const graph=(orgMode==="graph");
+  document.querySelectorAll("[data-orgmode]").forEach(b=>b.classList.toggle("on",b.dataset.orgmode===orgMode));
+  const gc=$("#orggraphctl"), om=$("#orgmain"), ob=$("#orgboard"), oh=$("#orghint"), ol=$("#orglegend");
+  if(gc) gc.style.display=graph?"":"none";
+  if(om) om.style.display=graph?"":"none";
+  if(oh) oh.style.display=graph?"":"none";
+  if(ob) ob.style.display=graph?"none":"";
+  if(!graph && ol) ol.style.display="none";
+  if(graph) renderOrg(); else { teardown3D(); renderModel(); }
+}
 document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>setTimelineView(b.dataset.tl));
+document.querySelectorAll("[data-orgmode]").forEach(b=>b.onclick=()=>{ orgMode=b.dataset.orgmode; localStorage.setItem("eh_orgmode",orgMode); renderOrgArea(); });
 
 /* ====================== ORGANIZATION (graph) VIEW ====================== */
 let orgColorBy = localStorage.getItem("eh_orgcolor") || "status";
@@ -1920,7 +1948,7 @@ function ensure3D(cb){ if(window.ForceGraph3D) return cb();
     if(!window.ForceGraph3D) await load3DScript("https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.4/dist/3d-force-graph.min.js");
     (window.__l3d||[]).forEach(f=>f()); window.__l3d=null;
   }catch(e){ window.__l3d=null; toast("Couldn't load the 3D view (network)."); org3d=false;
-    document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); } })(); }
+    document.querySelectorAll("[data-dim]").forEach(x=>x.classList.toggle("on",x.dataset.dim==="2d")); renderOrg(); } })(); }
 /* ===== Campus-Assistant "Engineering Brain" node styling (ported from EngineeringBrain.tsx) ===== */
 let org3dFocus=null, org3dSel=null, org3dNeigh=new Map();
 const _colCtx=document.createElement("canvas").getContext("2d");
@@ -2216,9 +2244,9 @@ function bindOrgPanZoom(canvas){
     const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
     document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
 }
-document.querySelectorAll(".orgtog[data-org]").forEach(b=>b.onclick=()=>{ orgColorBy=b.dataset.org; localStorage.setItem("eh_orgcolor",orgColorBy);
-  orgExpanded.clear();   // node ids differ between owner/status hierarchies
-  document.querySelectorAll(".orgtog[data-org]").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
+document.querySelectorAll("[data-org]").forEach(b=>b.onclick=()=>{ orgColorBy=b.dataset.org; localStorage.setItem("eh_orgcolor",orgColorBy);
+  orgExpanded.clear(); orgInitDone=false;   // node ids differ between owner/status hierarchies; reopen fully
+  document.querySelectorAll("[data-org]").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
 { const db=$("#orgDeps"); if(db) db.onclick=()=>{ orgDeps=!orgDeps; db.classList.toggle("on",orgDeps);
     if(org3d && org3dGraph) org3dGraph.graphData(orgGraphData()); else renderOrg(); }; }
 { const rb=$("#orgReset"); if(rb) rb.onclick=()=>{ orgZoom=1; orgPanX=0; orgPanY=0; orgExpanded.clear(); renderOrg(); }; }
@@ -2226,10 +2254,9 @@ function orgToggleFull(){ const w=$("#orgview"); const on=w.classList.toggle("fu
   const b=$("#orgFull"); if(b) b.textContent = on?"⛶ Exit full screen":"⛶ Full screen";
   setTimeout(renderOrg,30); }
 { const fb=$("#orgFull"); if(fb) fb.onclick=orgToggleFull; }
-document.querySelectorAll(".dimtog").forEach(b=>b.onclick=()=>{ org3d=(b.dataset.dim==="3d");
-  if(org3d && orgExpanded.size===0) orgExpandAll();   // open 3D as the full labelled brain, like the reference
-  document.querySelectorAll(".dimtog").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
-function renderTimeline(){ if(timelineView==="org") renderOrg(); else if(timelineView==="model") renderModel(); else renderGrid(); }
+document.querySelectorAll("[data-dim]").forEach(b=>b.onclick=()=>{ org3d=(b.dataset.dim==="3d");
+  document.querySelectorAll("[data-dim]").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
+function renderTimeline(){ if(timelineView==="org"){ orgMode==="board"? renderModel() : renderOrg(); } else renderGrid(); }
 
 /* ====================== REFERENCE MODEL (board) VIEW ====================== */
 let modelPhase = -1;   // -1 = all phases; 0/1/2 = a single phase
@@ -2239,7 +2266,7 @@ function initials(name){ name=ownerCanon(name); if(name==="Shared") return "◇"
 function avatarHTML(owner,size){ size=size||20; const o=ownerCanon(owner);
   return `<span class="avatar" title="${esc(o)}" style="background:${ownerColor(o)};width:${size}px;height:${size}px;font-size:${Math.round(size*0.42)}px">${esc(initials(o))}</span>`; }
 function renderModel(){
-  const wrap=$("#modelview"); if(!wrap) return;
+  const wrap=$("#orgboard"); if(!wrap) return;
   const secs=sectionsOf(tasks);
   let bar=`<div class="rmbar"><div class="rmphase">`+
     [[-1,"All phases"],[0,"Phase 1"],[1,"Phase 2"],[2,"Phase 3"]].map(([v,l])=>`<button data-ph="${v}" class="${v===modelPhase?'on':''}">${l}</button>`).join("")+
@@ -2276,11 +2303,10 @@ function renderModel(){
 
 /* ====================== RENDER ALL ====================== */
 function renderAll(){ renderDash(); renderChips(); renderLegend();
-  const org=(timelineView==="org"), model=(timelineView==="model"), grid=!org&&!model;
+  const org=(timelineView==="org"), grid=!org;
   const gw=$(".gwrap"); if(gw) gw.style.display=grid?"":"none";
   const ov=$("#orgview"); if(ov) ov.style.display=org?"":"none";
-  const mv=$("#modelview"); if(mv) mv.style.display=model?"":"none";
-  if(org) renderOrg(); else if(model) renderModel(); else renderGrid();
+  if(org) renderOrgArea(); else renderGrid();
   fillWeekSelects(); fillSecList(); renderBudget();
   document.querySelectorAll(".vtab").forEach(b=>b.classList.toggle("active",b.dataset.tl===timelineView)); }
 
