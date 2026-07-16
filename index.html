@@ -558,6 +558,60 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .bhero.act .v{background:linear-gradient(90deg,var(--deo),var(--ok));-webkit-background-clip:text;background-clip:text;color:transparent}
 .bcmp{font-size:11.5px; color:var(--mut); margin-top:9px}
 
+/* ============ BUDGET — business overview ============ */
+.btoolbar{display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap}
+.bviewtog{display:inline-flex; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:3px}
+.bvtab{padding:7px 15px; border:0; background:transparent; color:var(--mut); font-size:13px; font-weight:600; border-radius:7px; cursor:pointer; display:inline-flex; align-items:center; gap:6px}
+.bvtab.on{background:color-mix(in srgb,var(--deo) 14%,var(--panel-solid)); color:var(--txt); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--deo) 40%,var(--line-strong))}
+.btoolbar .bthint{font-size:12px; color:var(--mut); margin-left:auto}
+.kpirow{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:13px; margin-bottom:16px}
+.kpi{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); padding:15px 16px; position:relative; overflow:hidden}
+.kpi::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--kpi-accent,var(--deo))}
+.kpi .kk{font-size:11px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--mut)}
+.kpi .kv{font-size:26px; font-weight:750; letter-spacing:-.02em; margin-top:5px; font-variant-numeric:tabular-nums; color:var(--txt)}
+.kpi .ks{font-size:11.5px; color:var(--mut); margin-top:5px; display:flex; align-items:center; gap:5px}
+.kpi .kpill{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; padding:1px 8px; border-radius:20px}
+.kpill.good{background:color-mix(in srgb,var(--ok) 15%,transparent); color:var(--ok)}
+.kpill.warn{background:color-mix(in srgb,#fab219 18%,transparent); color:#b7791f}
+.kpill.bad{background:color-mix(in srgb,var(--bad) 15%,transparent); color:var(--bad)}
+[data-theme="dark"] .kpill.warn{color:#fab219}
+.bcharts{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px}
+@media (max-width:900px){.bcharts{grid-template-columns:1fr}}
+.bchart{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); padding:16px 18px}
+.bchart h4{margin:0 0 3px; font-size:14px; font-weight:700; color:var(--txt); letter-spacing:-.01em}
+.bchart .csub{font-size:11.5px; color:var(--mut); margin:0 0 14px}
+.bchart.full{grid-column:1/-1}
+.bch-row{display:flex; align-items:center; gap:12px}
+.donutwrap{display:flex; align-items:center; gap:18px; flex-wrap:wrap}
+.donut-legend{display:flex; flex-direction:column; gap:7px; flex:1; min-width:160px}
+.dl-item{display:flex; align-items:center; gap:8px; font-size:12.5px}
+.dl-sw{width:11px; height:11px; border-radius:3px; flex:none}
+.dl-nm{color:var(--txt2); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.dl-v{font-variant-numeric:tabular-nums; font-weight:700; color:var(--txt)}
+.dl-pct{font-size:11px; color:var(--mut); font-variant-numeric:tabular-nums; width:38px; text-align:right}
+.bullet{display:flex; flex-direction:column; gap:13px}
+.bl-row .bl-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12.5px}
+.bl-row .bl-nm{display:flex; align-items:center; gap:7px; color:var(--txt2); font-weight:600}
+.bl-row .bl-sw{width:9px; height:9px; border-radius:2px; flex:none}
+.bl-row .bl-fig{font-variant-numeric:tabular-nums; color:var(--mut)}
+.bl-row .bl-fig b{color:var(--txt)}
+.bl-track{position:relative; height:16px; border-radius:6px; background:var(--panel2); border:1px solid var(--line); overflow:hidden}
+.bl-est{position:absolute; top:0; bottom:0; left:0; background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--line-strong) 55%,transparent) 0 5px,transparent 5px 10px)}
+.bl-act{position:absolute; top:0; bottom:0; left:0; border-radius:6px 0 0 6px}
+.bl-over{position:absolute; top:-1px; bottom:-1px; width:2px; background:var(--bad)}
+.vartable{width:100%; border-collapse:collapse; font-size:13px}
+.vartable th{text-align:right; padding:9px 12px; font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--mut); border-bottom:1px solid var(--line)}
+.vartable th:first-child{text-align:left}
+.vartable td{padding:9px 12px; text-align:right; font-variant-numeric:tabular-nums; border-bottom:1px solid var(--grid-line); color:var(--txt2)}
+.vartable td:first-child{text-align:left; color:var(--txt); font-weight:600; display:flex; align-items:center; gap:8px}
+.vartable td .vt-sw{width:9px;height:9px;border-radius:2px;flex:none}
+.vartable tr:last-child td{border-bottom:0}
+.vartable tr.vt-tot td{font-weight:800; color:var(--txt); border-top:2px solid var(--line-strong); background:var(--panel2)}
+.vt-var.pos{color:var(--ok)} .vt-var.neg{color:var(--bad)}
+.paceleg{display:flex; gap:16px; margin-top:10px; font-size:12px; color:var(--mut); flex-wrap:wrap}
+.paceleg span{display:inline-flex; align-items:center; gap:6px}
+.paceleg i{width:12px; height:12px; border-radius:3px; display:inline-block}
+
 .btable{background:var(--panel); backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--card-shadow); overflow:hidden; margin-bottom:14px}
 .bth{display:grid; grid-template-columns:1.6fr repeat(2,1fr); gap:10px; padding:12px 18px; background:var(--sec-bg); border-bottom:1px solid var(--line); font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--mut)}
 .bth .cat{color:var(--deo); font-size:12px; letter-spacing:.06em}
@@ -2621,15 +2675,89 @@ function fmtDate(d){ const x=pDate(d); return isNaN(x)?"—":x.toLocaleDateStrin
 function inp(sec,idx,field,val,cls){ return `<input class="bin ${cls||''}" data-sec="${sec}" data-idx="${idx}" data-field="${field}" value="${esc(val)}">`; }
 function numCell(sec,idx,field,val,cls){ return editMode? inp(sec,idx,field,val,cls) : `<span class="${cls||''}">${esc(val)}</span>`; }
 
+/* ===== BUDGET — business overview (KPIs, charts, variance) ===== */
+let budgetView = localStorage.getItem("eh_bview")||"overview";
+// validated 5-colour categorical palette (dataviz skill), stepped per theme
+function budgetCatColors(){ return (document.documentElement.getAttribute("data-theme")==="dark")
+  ? ["#3987e5","#199e70","#c98500","#008300","#9085e9"]
+  : ["#2a78d6","#1baf7a","#eda100","#008300","#4a3aa7"]; }
+function bulletChart(cats){ const max=Math.max(1,...cats.map(x=>Math.max(x.a,x.e)));
+  return `<div class="bullet">`+cats.map(x=>{ const ew=Math.min(100,x.e/max*100), aw=Math.min(100,x.a/max*100), over=x.a>x.e&&x.e>0;
+    return `<div class="bl-row"><div class="bl-top"><span class="bl-nm"><span class="bl-sw" style="background:${x.col}"></span>${x.name}</span><span class="bl-fig"><b>${money(x.a)}</b> / ${money(x.e)}</span></div>`+
+      `<div class="bl-track" title="${esc(x.name)}: ${money(x.a)} actual of ${money(x.e)} estimate"><div class="bl-est" style="width:${ew}%"></div><div class="bl-act" style="width:${aw}%;background:${x.col}"></div>${over?`<div class="bl-over" style="left:${ew}%"></div>`:""}</div></div>`;
+  }).join("")+`</div>`; }
+function donutChart(cats,total){ if(!total||!cats.length) return `<div class="csub" style="color:var(--mut)">No estimate entered yet.</div>`;
+  const rr=44, C=2*Math.PI*rr; let off=0, ring="";
+  cats.forEach(x=>{ const frac=x.e/total, len=frac*C;
+    ring+=`<circle cx="60" cy="60" r="${rr}" fill="none" stroke="${x.col}" stroke-width="19" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 60 60)"><title>${esc(x.name)}: ${money(x.e)} (${Math.round(frac*100)}%)</title></circle>`; off+=len; });
+  const legend=cats.map(x=>`<div class="dl-item"><span class="dl-sw" style="background:${x.col}"></span><span class="dl-nm">${x.name}</span><span class="dl-v">${money(x.e)}</span><span class="dl-pct">${Math.round(x.e/total*100)}%</span></div>`).join("");
+  return `<div class="donutwrap"><svg viewBox="0 0 120 120" width="132" height="132" style="flex:none" role="img" aria-label="Budget composition">${ring}<text x="60" y="55" text-anchor="middle" style="fill:var(--mut);font-size:8px;font-weight:800;letter-spacing:.1em">TOTAL</text><text x="60" y="70" text-anchor="middle" style="fill:var(--txt);font-size:11px;font-weight:800;font-family:var(--mono)">${money(total)}</text></svg><div class="donut-legend">${legend}</div></div>`; }
+function paceChart(used,time){ used=Math.max(0,Math.min(100,used)); time=Math.max(0,Math.min(100,time));
+  const bar=(label,v,col)=>`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px"><span style="color:var(--txt2);font-weight:600">${label}</span><span style="font-variant-numeric:tabular-nums;font-weight:700;color:var(--txt)">${Math.round(v)}%</span></div><div class="bl-track" style="height:14px"><div class="bl-act" style="width:${v}%;background:${col}"></div></div></div>`;
+  const over=used>time+6;
+  return bar("Budget spent",used,"var(--deo)")+bar("Schedule elapsed",time,"#94a3b8")+
+    `<div class="paceleg"><span>${over?'⚠ Spending is ahead of the schedule':'✓ Spending is in step with the schedule'}</span></div>`; }
+function memberCostChart(){ const mem=(budget.labor||[]).filter(r=>memberList().includes(r.name));
+  if(!mem.length) return `<h4>Cost by member</h4><p class="csub" style="color:var(--mut)">No member labor lines yet.</p>`;
+  const rows=mem.map(r=>({name:r.name,cost:num(r.rate)*memberActualHours(r.name),hrs:memberActualHours(r.name)})).sort((a,b)=>b.cost-a.cost);
+  const max=Math.max(1,...rows.map(x=>x.cost));
+  const bars=rows.map(x=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span style="color:var(--txt2);font-weight:600">${esc(x.name)}</span><span style="font-variant-numeric:tabular-nums;color:var(--mut)"><b style="color:var(--txt)">${money(x.cost)}</b> · ${Math.round(x.hrs*10)/10}h</span></div><div class="bl-track" style="height:13px"><div class="bl-act" style="width:${x.cost/max*100}%;background:var(--deo)"></div></div></div>`).join("");
+  return `<h4>Actual labor cost by member</h4><p class="csub">Timeline-logged hours × rate</p>${bars}`; }
+function varianceTable(cats,totalE,totalA){
+  const row=(nm,col,eV,aV)=>{ const v=eV-aV, vp=eV?Math.round(v/eV*100):0, cls=v>=0?'pos':'neg';
+    return `<tr><td>${col?`<span class="vt-sw" style="background:${col}"></span>`:''}${nm}</td><td>${money(eV)}</td><td>${money(aV)}</td><td class="vt-var ${cls}">${v<0?'−':''}${money(Math.abs(v))}</td><td class="vt-var ${cls}">${v<0?'−':''}${Math.abs(vp)}%</td></tr>`; };
+  const body=cats.map(x=>row(x.name,x.col,x.e,x.a)).join("");
+  const v=totalE-totalA, vp=totalE?Math.round(v/totalE*100):0, cls=v>=0?'pos':'neg';
+  const tot=`<tr class="vt-tot"><td>Total</td><td>${money(totalE)}</td><td>${money(totalA)}</td><td class="vt-var ${cls}">${v<0?'−':''}${money(Math.abs(v))}</td><td class="vt-var ${cls}">${v<0?'−':''}${Math.abs(vp)}%</td></tr>`;
+  return `<table class="vartable"><thead><tr><th>Category</th><th>Estimate</th><th>Actual</th><th>Variance</th><th>Var %</th></tr></thead><tbody>${body}${tot}</tbody></table>`; }
+function renderBudgetOverview(c,pct){
+  const cols=budgetCatColors();
+  const cats=[
+    {name:"Direct Labor",a:c.TDLa,e:c.TDLe,col:cols[0]},
+    {name:"Contract Labor",a:c.TCLa,e:c.TCLe,col:cols[1]},
+    {name:"Materials",a:c.TDMa,e:c.TDMe,col:cols[2]},
+    {name:"Equipment",a:c.ETRMa,e:c.ETRMe,col:cols[3]},
+    {name:"Overhead",a:c.bizA,e:c.bizE,col:cols[4]},
+  ];
+  const totalE=c.totalE, totalA=c.totalA, remaining=Math.max(0,totalE-totalA);
+  const usedPct= totalE? totalA/totalE*100 : 0;
+  const projected = pct>1 ? totalA/(pct/100) : totalE;   // linear burn projection
+  const variance = totalE - projected;                    // + = under budget
+  const overPace = usedPct > pct+6;
+  const lim = +cfg.budget_limit||0;
+  const pill=(cls,txt)=>`<span class="kpill ${cls}">${txt}</span>`;
+  const kpi=`<div class="kpirow">
+    <div class="kpi" style="--kpi-accent:${cols[0]}"><div class="kk">Total estimate</div><div class="kv">${money(totalE)}</div><div class="ks">${cats.filter(x=>x.e>0).length} cost categories</div></div>
+    <div class="kpi" style="--kpi-accent:var(--ok)"><div class="kk">Actual to date</div><div class="kv">${money(totalA)}</div><div class="ks">${Math.round(usedPct)}% of estimate used</div></div>
+    <div class="kpi" style="--kpi-accent:var(--can)"><div class="kk">Remaining</div><div class="kv">${money(remaining)}</div><div class="ks">of ${money(totalE)} budget</div></div>
+    <div class="kpi" style="--kpi-accent:${overPace?'var(--bad)':'var(--ok)'}"><div class="kk">Projected final</div><div class="kv">${money(projected)}</div><div class="ks">at current burn ${variance>=0?pill('good','▲ '+money(Math.abs(variance))+' under'):pill('bad','▼ '+money(Math.abs(variance))+' over')}</div></div>
+    <div class="kpi" style="--kpi-accent:${overPace?'#fab219':'var(--ok)'}"><div class="kk">Budget health</div><div class="kv" style="font-size:20px">${overPace?'Watch pace':'On track'}</div><div class="ks">${Math.round(usedPct)}% spent vs ${Math.round(pct)}% time elapsed</div></div>
+  </div>`;
+  const charts=`<div class="bcharts">
+    <div class="bchart"><h4>Actual vs estimate by category</h4><p class="csub">Solid = spent · hatched = estimated · red tick = over</p>${bulletChart(cats)}</div>
+    <div class="bchart"><h4>Estimated budget composition</h4><p class="csub">Share of the ${money(totalE)} estimate</p>${donutChart(cats.filter(x=>x.e>0),totalE)}</div>
+    <div class="bchart"><h4>Spending pace</h4><p class="csub">Is spend keeping step with the schedule?</p>${paceChart(usedPct,pct)}</div>
+    <div class="bchart">${memberCostChart()}</div>
+  </div>`;
+  const tbl=`<div class="bchart full"><h4>Variance analysis</h4><p class="csub">Estimate vs actual by category — positive variance is under budget</p>${varianceTable(cats,totalE,totalA)}</div>`;
+  let limitNote="";
+  if(lim){ const over=totalE>lim; limitNote=`<div class="blimit ${over?'over':'ok'}" style="margin-top:14px">${over?'⚠ Over budget limit':'✓ Within budget limit'} — total estimate ${money(totalE)} of ${money(lim)} cap set by admin${over?` (${money(totalE-lim)} over)`:''}.</div>`; }
+  return kpi + charts + tbl + limitNote;
+}
 function renderBudget(){
   if(!budget||!budget.labor){ budget=defaultBudget(); }
   budget.today = liveToday();
   const c=calcBudget(), pct=timePct();
   const spent= c.totalE? Math.min(100,Math.round(c.totalA/c.totalE*100)):0;
   const e=editMode;
+  const toolbar=`<div class="btoolbar"><div class="bviewtog">
+     <button class="bvtab ${budgetView==='overview'?'on':''}" data-bview="overview" type="button">📊 Overview</button>
+     <button class="bvtab ${budgetView==='details'?'on':''}" data-bview="details" type="button">▤ Details</button>
+   </div><span class="bthint">${budgetView==='overview'?'Executive summary — switch to Details to edit line items':'Full line-item budget · turn on Edit (top-right) to change values'}</span></div>`;
+  if(budgetView==='overview'){ $("#viewBudget").innerHTML = toolbar + renderBudgetOverview(c,pct); return; }
 
   // ---- dashboard cards ----
-  let h=`<div class="bdash">
+  let h=toolbar+`<div class="bdash">
     <div class="card tcard"><div class="k">Project timeline</div>
       <div class="tline"><i style="width:${pct}%"></i><span class="now" style="left:${pct}%"></span></div>
       <div class="tdates">
@@ -2749,6 +2877,8 @@ $("#viewBudget").addEventListener("change",ev=>{
   saveBudget(); renderBudget();
 });
 $("#viewBudget").addEventListener("click",ev=>{
+  const bv=ev.target.closest("[data-bview]");
+  if(bv){ budgetView=bv.dataset.bview; localStorage.setItem("eh_bview",budgetView); renderBudget(); return; }
   const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]");
   if(add){ const s=add.dataset.add; if(!budget[s])budget[s]=[];
     const def={labor:{name:"New role",rate:12,hrsA:0,hrsE:0},contract:{name:"New contractor",rate:0,hrsA:0,hrsE:0},
