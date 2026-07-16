@@ -2046,11 +2046,11 @@ function node3DObject(n){ if(!window.THREE) return null;
   else if(n.kind==="section"){ g.add(sphereMesh(n.color,12)); half=12; }
   else if(n.kind==="owner"){ // members (incl. Shared) render as big as the project node
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:initialsTex(n.av,n.avColor||n.color),depthWrite:false})); sp.scale.set(30,30,1); g.add(sp); half=15; }
-  else { g.add(sphereMesh(n.color,2.8)); half=2.8; }                 // task leaf
+  else { g.add(sphereMesh(n.color,5.5)); half=5.5; }                 // task leaf — bigger dot, still smaller than the hubs
   const big=(n.kind!=="task");
-  const label=txtSprite(n.name||"", big?40:26, big?12:6);
-  label.position.set(0, -(half+(big?7:3.5)), 0);
-  if(n.kind==="task"){ label.visible=false; label.userData.leafLabel=true; }   // outer labels appear only on focus
+  const label=txtSprite(n.name||"", big?40:26, big?12:6.5);
+  label.position.set(0, -(half+(big?7:4)), 0);
+  if(n.kind==="task"){ label.visible=!!orgIsolate; label.userData.leafLabel=true; }   // outer labels show when isolated (or on hover)
   g.add(label); return g; }
 /* ---- hierarchy + progressive disclosure (collapse/expand) — shared by 2D & 3D ---- */
 let orgExpanded = new Set();   // ids of nodes the user has opened; the centre is always open
@@ -2084,10 +2084,24 @@ function orgTree(){
 }
 const orgHasKids = n => (n.children||[]).length>0;
 const orgIsOpen  = n => n.kind==="center" || orgExpanded.has(n.id);
-const orgVisKids = n => orgIsOpen(n) ? (n.children||[]) : [];
+// ISOLATE-ON-CLICK: null = initial full view; else only the clicked node's lineage + its whole subtree is shown
+let orgIsolate = null, _orgScope = null;
+function orgIsolateScope(){
+  if(!orgIsolate) return null;
+  const scope=new Set(["__c"]); const root=orgTree(); let found=null;
+  (function dfs(n,anc){ if(found) return; const a=anc.concat(n.id);
+    if(n.id===orgIsolate){ found=n; a.forEach(id=>scope.add(id)); return; }
+    (n.children||[]).forEach(ch=>dfs(ch,a)); })(root,[]);
+  if(!found){ orgIsolate=null; return null; }                      // node gone (data changed) → reset
+  (function desc(n){ (n.children||[]).forEach(ch=>{ scope.add(ch.id); desc(ch); }); })(found);
+  return scope;
+}
+function orgRefreshScope(){ _orgScope = orgIsolate ? orgIsolateScope() : null; }
+const orgVisKids = n => _orgScope ? (n.children||[]).filter(ch=>_orgScope.has(ch.id))     // isolated: only in-scope branch, fully open
+  : (orgIsOpen(n) ? (n.children||[]) : []);
 function orgToggle(id){
-  if(id==="__c"){ orgExpanded.clear(); return; }              // clicking the project collapses everything
-  if(orgExpanded.has(id)) orgExpanded.delete(id);            // hide this branch (its sub-state is kept, so reopening restores it fully)
+  if(id==="__c"){ orgExpanded.clear(); return; }
+  if(orgExpanded.has(id)) orgExpanded.delete(id);
   else orgExpanded.add(id);
 }
 /* 3-state task colour for the brain: green = complete · yellow = good standing · red = late */
@@ -2125,6 +2139,7 @@ function orgLayoutPositions(){
   })(root,0,0,Math.PI*2,0);
   return pos; }
 function orgGraphData(){
+  orgRefreshScope();
   const root=orgTree(); const nodes=[], links=[]; const visTask=new Set();
   (function walk(node){
     nodes.push({ id:node.id, nid:node.id, kind:node.kind,
@@ -2159,7 +2174,7 @@ function org3dHighlight(){ if(!org3dGraph) return;
   org3dGraph.graphData().nodes.forEach(n=>{ const obj=n.__threeObj; if(!obj) return;
     const op = (!bright || bright.has(n.id))? 1 : 0.12;
     obj.traverse(o=>{ if(o.material){ o.material.transparent=true; o.material.opacity=op; }
-      if(o.userData && o.userData.leafLabel) o.visible = !!bright && bright.has(n.id); }); }); }
+      if(o.userData && o.userData.leafLabel) o.visible = orgIsolate ? true : (!!bright && bright.has(n.id)); }); }); }
 function render3D(canvas){
   ensure3D(()=>{
     if(!org3d) return;
@@ -2176,10 +2191,11 @@ function render3D(canvas){
         .linkDirectionalArrowLength(l=>l.dep?3:0).linkDirectionalArrowRelPos(1)
         .onNodeHover(n=>{ canvas.style.cursor = n? "pointer":""; org3dFocus = n? n.id : org3dSel; org3dHighlight(); })
         .onNodeClick(n=>{
-          if(n.kind==="task"){ if(n.tid){ org3dSel=n.id; openTaskDrawer(n.tid); } }
-          else if(n.hasKids){ orgToggle(n.nid); org3dApply(); }
-          org3dFocus=n.id; org3dHighlight();
-          try{ org3dGraph.cameraPosition({x:n.x,y:n.y,z:(n.z||0)+240},{x:n.x,y:n.y,z:n.z||0},700); }catch(e){} })
+          if(n.kind==="task"){ if(n.tid){ org3dSel=n.id; openTaskDrawer(n.tid); } return; }
+          if(n.nid==="__c"){ orgIsolate=null; orgExpandAll(); }   // project node → back to the initial full view
+          else { orgIsolate=n.nid; }                              // any other node → isolate its branch + name its contents
+          org3dFocus=null; org3dApply();
+          setTimeout(()=>{ try{ org3dGraph.zoomToFit(650,70); }catch(e){} }, 140); })
         .onBackgroundClick(()=>{ org3dSel=null; org3dFocus=null; org3dHighlight(); });
       org3dGraph.onEngineStop(()=>{ if(org3dGraph.__framed) return; org3dGraph.__framed=true;
         try{ org3dGraph.cameraPosition({x:0,y:0,z:900},{x:0,y:0,z:0},0); org3dGraph.zoomToFit(600,60); }catch(e){} }); }
@@ -2224,6 +2240,7 @@ function renderOrgLegend(byOwner){ const el=$("#orglegend"); if(!el) return; con
 function renderOrg(){
   const canvas=$("#orgcanvas"); if(!canvas) return;
   if(!orgInitDone && tasks && tasks.length){ orgExpandAll(); orgInitDone=true; }   // open with all wings spread
+  orgRefreshScope();
   const byOwner=(orgColorBy==="owner");
   renderOrgLegend(byOwner); renderOrgSide();
   if(org3d){ render3D(canvas); return; }
@@ -2295,7 +2312,9 @@ function renderOrg(){
     el.addEventListener("mouseleave",hideTip);
   });
   canvas.querySelectorAll(".onode[data-nid]").forEach(el=>{
-    el.addEventListener("click",()=>{ orgToggle(el.dataset.nid); renderOrg(); });
+    el.addEventListener("click",()=>{ const id=el.dataset.nid;
+      if(id==="__c"){ orgIsolate=null; orgExpandAll(); } else { orgIsolate=id; }   // isolate branch / project = reset
+      orgZoom=1; orgPanX=0; orgPanY=0; renderOrg(); });
   });
   bindOrgPanZoom(canvas);
 }
@@ -2313,7 +2332,8 @@ document.querySelectorAll("[data-org]").forEach(b=>b.onclick=()=>{ orgColorBy=b.
   document.querySelectorAll("[data-org]").forEach(x=>x.classList.toggle("on",x===b)); renderOrg(); });
 { const db=$("#orgDeps"); if(db) db.onclick=()=>{ orgDeps=!orgDeps; db.classList.toggle("on",orgDeps);
     if(org3d && org3dGraph) org3dGraph.graphData(orgGraphData()); else renderOrg(); }; }
-{ const rb=$("#orgReset"); if(rb) rb.onclick=()=>{ orgZoom=1; orgPanX=0; orgPanY=0; orgExpanded.clear(); renderOrg(); }; }
+{ const rb=$("#orgReset"); if(rb) rb.onclick=()=>{ orgZoom=1; orgPanX=0; orgPanY=0; orgIsolate=null; orgExpandAll();   // back to the initial full view
+    if(org3d && org3dGraph){ org3dApply(); setTimeout(()=>{ try{ org3dGraph.zoomToFit(650,60); }catch(e){} },140); } else renderOrg(); }; }
 function orgToggleFull(){ const w=$("#orgview"); const on=w.classList.toggle("full");
   const b=$("#orgFull"); if(b) b.textContent = on?"⛶ Exit full screen":"⛶ Full screen";
   setTimeout(renderOrg,30); }
