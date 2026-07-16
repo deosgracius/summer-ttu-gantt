@@ -2200,7 +2200,8 @@ function org3dApply(){ if(!org3dGraph) return; const data=orgGraphData();
   org3dGraph.graphData(data); }
 function org3dHighlight(){ if(!org3dGraph) return;
   org3dGraph.linkColor(org3dGraph.linkColor()).linkWidth(org3dGraph.linkWidth()).linkDirectionalParticles(org3dGraph.linkDirectionalParticles());
-  const f=org3dFocus, bright = f? new Set([f, ...(org3dNeigh.get(f)||[])]) : null;
+  // while a node is isolated, EVERYTHING in view stays fully visible & labelled — no hover dimming
+  const f = orgIsolate ? null : org3dFocus, bright = f? new Set([f, ...(org3dNeigh.get(f)||[])]) : null;
   org3dGraph.graphData().nodes.forEach(n=>{ const obj=n.__threeObj; if(!obj) return;
     const op = (!bright || bright.has(n.id))? 1 : 0.12;
     obj.traverse(o=>{ if(o.material){ o.material.transparent=true; o.material.opacity=op; }
@@ -2214,10 +2215,10 @@ function render3D(canvas){
         .nodeLabel(n=> n.kind==="task"? esc(n.name) : `<b>${esc(n.name)}</b>`)
         .nodeThreeObjectExtend(false).nodeThreeObject(node3DObject)
         .linkColor(l=>{ const base=l.color||"#5a6d94";
-          if(!org3dFocus) return colA(base, l.dep?0.7:(l.cp?0.95:0.62));
+          if(orgIsolate || !org3dFocus) return colA(base, l.dep?0.7:(l.cp?0.95:0.62));   // isolated: all wires stay bright
           return org3dHot(l)? colA(base,1): colA(base,0.12); })
-        .linkWidth(l=> org3dHot(l)?2.6 : (l.cp?1.8:1.3))
-        .linkDirectionalParticles(l=> org3dHot(l)?3:0).linkDirectionalParticleWidth(2)
+        .linkWidth(l=> (!orgIsolate && org3dHot(l))?2.6 : (l.cp?1.8:1.3))
+        .linkDirectionalParticles(l=> (!orgIsolate && org3dHot(l))?3:0).linkDirectionalParticleWidth(2)
         .linkDirectionalArrowLength(l=>l.dep?3:0).linkDirectionalArrowRelPos(1)
         .onNodeHover(n=>{ canvas.style.cursor = n? "pointer":""; org3dFocus = n? n.id : org3dSel; org3dHighlight(); })
         .onNodeClick(n=>{
@@ -2225,7 +2226,7 @@ function render3D(canvas){
           if(n.nid==="__c"){ orgIsolate=null; orgExpandAll(); }   // project node → back to the initial full view
           else { orgIsolate=n.nid; }                              // any other node → isolate its branch + name its contents
           org3dFocus=null; org3dApply();
-          setTimeout(()=>{ try{ org3dGraph.zoomToFit(650,70); }catch(e){} }, 140); })
+          setTimeout(()=>{ try{ org3dHighlight(); org3dGraph.zoomToFit(650,80); }catch(e){} }, 160); })
         .onBackgroundClick(()=>{ org3dSel=null; org3dFocus=null; org3dHighlight(); });
       org3dGraph.onEngineStop(()=>{ if(org3dGraph.__framed) return; org3dGraph.__framed=true;
         try{ org3dGraph.cameraPosition({x:0,y:0,z:900},{x:0,y:0,z:0},0); org3dGraph.zoomToFit(600,60); }catch(e){} }); }
