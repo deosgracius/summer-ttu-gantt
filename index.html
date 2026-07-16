@@ -3237,9 +3237,16 @@ function exportCSV(){
 /* one-click board-ready report: the budget Overview, printed / saved as PDF */
 function exportExecReport(){
   budgetView="overview"; localStorage.setItem("eh_bview","overview");
-  setView("budget"); renderBudget();
+  // a report on white paper must be light-themed regardless of the on-screen theme
+  const root=document.documentElement, prevTheme=root.getAttribute("data-theme");
+  if(prevTheme!=="light") root.setAttribute("data-theme","light");
+  setView("budget"); renderBudget();     // render AFTER switching so chart colours are picked for light
+  let restored=false; const restore=()=>{ if(restored) return; restored=true;
+    if(prevTheme && prevTheme!=="light") root.setAttribute("data-theme",prevTheme);
+    window.removeEventListener("afterprint",restore); };
+  window.addEventListener("afterprint",restore);
   toast("Preparing report — choose “Save as PDF” in the print dialog");
-  setTimeout(()=>{ try{ window.print(); }catch(e){} }, 400);
+  setTimeout(()=>{ try{ window.print(); }catch(e){} setTimeout(restore, 2000); }, 400);
 }
 function exportPDF(){
   const c=cfg, n=NW();
