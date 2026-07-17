@@ -684,6 +684,14 @@ button:not(:disabled):active,.tbtn:active,.chip:active,.tab:active,.hp-act:activ
 .hero-sub .hsk{font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--mut)}
 .hero-sub .hsv{font-family:var(--mono); font-size:17px; font-weight:700; color:var(--txt); margin-top:3px}
 .hero-sub .hsv.pos{color:var(--ok)} .hero-sub .hsv.neg{color:var(--bad)}
+.hero-sub .hs.clk{cursor:pointer; border-radius:9px; padding:5px 9px; margin:-5px -9px; transition:background .15s}
+.hero-sub .hs.clk:hover{background:color-mix(in srgb,var(--deo) 11%,transparent)}
+.hero-sub .hs.clk .hsk::after{content:" ›"; color:var(--deo); font-weight:800}
+.mw-big{font-family:var(--mono); font-size:32px; font-weight:750; color:var(--txt); letter-spacing:-.02em}
+.mw-delta{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; padding:2px 9px; border-radius:20px; margin-left:8px}
+.mw-delta.up{background:color-mix(in srgb,var(--bad) 14%,transparent); color:var(--bad)}
+.mw-delta.down{background:color-mix(in srgb,var(--ok) 14%,transparent); color:var(--ok)}
+.mw-delta.flat{background:var(--panel2); color:var(--mut)}
 .chiprow{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
 .bchip{display:inline-flex; align-items:center; gap:7px; padding:5px 12px; border-radius:20px; border:1px solid var(--line); background:var(--panel2); color:var(--txt2); font-size:12px; font-weight:600; cursor:pointer}
 .bchip.on{background:color-mix(in srgb,var(--deo) 16%,var(--panel-solid)); color:var(--txt); border-color:color-mix(in srgb,var(--deo) 45%,var(--line-strong))}
@@ -2989,6 +2997,76 @@ function riskPanel(){
   const al=alerts.map(a=>`<div class="risk-alert ${a.sev}">${a.sev==='high'?'⚠':'●'} ${esc(a.txt)}</div>`).join("");
   return `<div class="bchart full"><h4>Risk register &amp; alerts</h4><p class="csub">Tasks and conditions that need attention, ranked by severity</p>${al?`<div class="risk-alerts">${al}</div>`:""}${rows?`<div class="risk-list">${rows}</div>`:`<p class="csub" style="color:var(--ok)">✓ No at-risk tasks.</p>`}</div>`;
 }
+/* Click a hero metric → a drill-down insight panel (reuses the task drawer) */
+function openBudgetMetric(kind){
+  const dr=$("#taskDrawer"), sc=$("#drawerScrim"); if(!dr) return;
+  const c=calcBudget(), pct=timePct();
+  const N=Math.max(1,(cfg.weeks||[]).length), now=Math.max(0,Math.min(N-1,cfg.now_week||0));
+  const rateOf=o=>{ const L=budget.labor||[]; const l=L.find(r=>r.name===o); return l?num(l.rate):(L[0]?num(L[0].rate):12); };
+  const wkLabel=i=>(cfg.weeks&&cfg.weeks[i]&&cfg.weeks[i].label)||("W"+(i+1));
+  const WIN=4, lo=Math.max(0,now-(WIN-1)), phi=lo-1, plo=Math.max(0,lo-WIN);
+  const wkCost=new Array(N).fill(0), memWin={}, taskWin=[];
+  (tasks||[]).forEach(t=>{ const hbw=t.hours_by_week||{}, o=ownerCanon(t.owner), rate=rateOf(o); let th=0;
+    Object.keys(hbw).forEach(w=>{ const i=+w, h=num(hbw[w]); if(i<0||i>=N) return; wkCost[i]+=h*rate;
+      if(i>=lo && i<=now){ memWin[o]=(memWin[o]||0)+h*rate; th+=h; } });
+    if(th>0) taskWin.push({t,hrs:th,cost:th*rateOf(o)}); });
+  const recent=wkCost.slice(lo,now+1).reduce((s,v)=>s+v,0);
+  const prior=(phi>=plo && phi>=0)? wkCost.slice(plo,phi+1).reduce((s,v)=>s+v,0) : 0;
+  const dAbs=recent-prior, dPct= prior>0? Math.round(dAbs/prior*100) : null;
+  const totalE=c.totalE, totalA=c.totalA, remaining=Math.max(0,totalE-totalA), usedPct= totalE? totalA/totalE*100:0;
+  const cols=budgetCatColors();
+  const bar=(label,val,max,col)=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--txt2)">${label}</span><span style="font-variant-numeric:tabular-nums;color:var(--txt);font-weight:700">${money(val)}</span></div><div class="bl-track" style="height:10px"><div class="bl-act" style="width:${Math.round(Math.max(0,val)/Math.max(1,max)*100)}%;background:${col||'var(--deo)'}"></div></div></div>`;
+  let title="", eyebrow="Budget metric", body="";
+  if(kind==="recent"){
+    title="Recent spend";
+    const mx=Math.max(1,...wkCost.slice(lo,now+1));
+    let bars=""; for(let i=lo;i<=now;i++) bars+=bar(esc(wkLabel(i))+(i===now?" · current":""), wkCost[i], mx);
+    const memRows=Object.keys(memWin).sort((a,b)=>memWin[b]-memWin[a])
+      .map(m=>`<div class="dw-dep" style="cursor:default">${avatarHTML(m,18)}<span class="rmtn">${esc(m)}</span><span class="rmtsub">${money(memWin[m])}</span></div>`).join("");
+    const topT=taskWin.slice().sort((a,b)=>b.cost-a.cost).slice(0,5)
+      .map(x=>`<div class="dw-dep" data-go="${x.t.id}"><span class="rmdot" style="background:${orgTaskColor(x.t)}"></span><span class="rmtn">${esc(x.t.name)}</span><span class="rmtsub">${Math.round(x.hrs*10)/10}h · ${money(x.cost)}</span></div>`).join("");
+    const dCls= dPct===null?'flat': (dAbs>0?'up':'down');
+    const dTxt= dPct===null? 'no prior period' : `${dAbs>=0?'▲':'▼'} ${Math.abs(dPct)}% vs previous ${WIN} weeks`;
+    body=`<div><div class="mw-big">${money(recent)}<span class="mw-delta ${dCls}">${dTxt}</span></div>
+        <div style="font-size:12px;color:var(--mut);margin-top:6px">Labour cost logged in the last ${now-lo+1} week${now-lo?'s':''} (${esc(wkLabel(lo))} – ${esc(wkLabel(now))}). Previous ${WIN} weeks: <b style="color:var(--txt2)">${money(prior)}</b>.</div></div>
+      <div><div class="dw-sec-label">Week by week</div>${bars}</div>
+      ${memRows?`<div><div class="dw-sec-label">Who logged it</div><div class="dw-deps">${memRows}</div></div>`:""}
+      ${topT?`<div><div class="dw-sec-label">Top tasks driving it</div><div class="dw-deps">${topT}</div></div>`:`<div class="dw-sec-label">No hours logged in this window.</div>`}`;
+  } else if(kind==="actual"){
+    title="Actual to date";
+    const catsA=[["Direct Labor",c.TDLa,cols[0]],["Contract",c.TCLa,cols[1]],["Materials",c.TDMa,cols[2]],["Equipment",c.ETRMa,cols[3]],["Overhead",c.bizA,cols[4]]];
+    const mx=Math.max(1,...catsA.map(x=>x[1]));
+    body=`<div><div class="mw-big">${money(totalA)}</div><div style="font-size:12px;color:var(--mut);margin-top:6px">${Math.round(usedPct)}% of the ${money(totalE)} estimate, with ${Math.round(pct)}% of the schedule elapsed.</div></div>
+      <div><div class="dw-sec-label">Where it went</div>${catsA.map(([n,v,col])=>bar(n,v,mx,col)).join("")}</div>
+      <div class="dw-grid"><div class="dw-field"><div class="k">Estimate</div><div class="v">${money(totalE)}</div></div><div class="dw-field"><div class="k">Remaining</div><div class="v">${money(remaining)}</div></div></div>`;
+  } else if(kind==="remaining"){
+    title="Remaining budget";
+    const weeksLeft=Math.max(0,N-1-now), burn= (now+1)? totalA/(now+1) : 0;
+    const runway= burn>0? remaining/burn : Infinity;
+    const willLast = runway>=weeksLeft;
+    body=`<div><div class="mw-big">${money(remaining)}</div><div style="font-size:12px;color:var(--mut);margin-top:6px">Left of the ${money(totalE)} estimate.</div></div>
+      <div class="dw-grid">
+        <div class="dw-field"><div class="k">Burn rate</div><div class="v">${money(burn)}/wk</div></div>
+        <div class="dw-field"><div class="k">Weeks left</div><div class="v">${weeksLeft}</div></div>
+        <div class="dw-field"><div class="k">Runway</div><div class="v">${isFinite(runway)?Math.floor(runway)+" wks":"—"}</div></div>
+        <div class="dw-field"><div class="k">Verdict</div><div class="v" style="color:${willLast?'var(--ok)':'var(--bad)'};font-size:13px">${willLast?'Covers the plan':'Short of the plan'}</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--txt2);line-height:1.5">At the current burn of <b>${money(burn)}/week</b>, the remaining budget lasts about <b>${isFinite(runway)?Math.floor(runway):'—'}</b> more weeks against <b>${weeksLeft}</b> week${weeksLeft===1?'':'s'} of schedule left.</div>`;
+  } else {
+    title="Budget used";
+    const overPace= usedPct > pct+6;
+    body=`<div><div class="mw-big">${Math.round(usedPct)}%<span class="mw-delta ${overPace?'up':'down'}">${overPace?'ahead of pace':'in step / under pace'}</span></div>
+        <div style="font-size:12px;color:var(--mut);margin-top:6px">${money(totalA)} of ${money(totalE)} spent.</div></div>
+      <div>${bar("Budget spent", usedPct, 100, "var(--deo)")}${bar("Schedule elapsed", pct, 100, "#94a3b8")}</div>
+      <div style="font-size:12px;color:var(--txt2);line-height:1.5">${overPace? 'Spending is running ahead of the schedule — check the risk register for what is driving it.' : 'Spending is tracking at or below the pace of the schedule.'}</div>`;
+  }
+  dr.innerHTML=`<div class="dw-head"><div class="dw-eyebrow">${eyebrow}</div><h3 class="dw-title">${title}</h3></div>
+    <div class="dw-body">${body}</div>
+    <div class="dw-acts"><button class="btn-ghost" id="dwClose" style="flex:1">Close</button></div>`;
+  dr.classList.add("show"); if(sc) sc.classList.add("show"); dr.setAttribute("aria-hidden","false"); modalOpen=true;
+  $("#dwClose").onclick=closeTaskDrawer;
+  dr.querySelectorAll(".dw-dep[data-go]").forEach(el=> el.onclick=()=>openTaskDrawer(el.dataset.go));
+}
 /* AURA-style premium hero: big total + inline metrics + tap-to-scope chips + trend + left rail of metric cards */
 function renderBudgetHero(c,pct){
   const totalE=c.totalE, totalA=c.totalA, remaining=Math.max(0,totalE-totalA), usedPct=totalE?totalA/totalE*100:0;
@@ -3058,10 +3136,12 @@ function renderBudgetHero(c,pct){
     <div class="hero-eyebrow"><span style="color:var(--deo)">◆</span> ${heroTitle} <span style="color:var(--mut);font-weight:600;text-transform:none;letter-spacing:0">as of ${date}</span></div>
     <div class="hero-num">${scopeAll?money(totalE):money(scopedActual)}</div>
     <div class="hero-sub">
-      <div class="hs"><div class="hsk">Actual</div><div class="hsv">${money(scopeAll?totalA:scopedActual)}</div></div>
-      <div class="hs"><div class="hsk">${scopeAll?'Remaining':'Hours logged'}</div><div class="hsv">${scopeAll?money(remaining):(Math.round(memberActualHours(budgetScope)*10)/10+'h')}</div></div>
-      <div class="hs"><div class="hsk">Used</div><div class="hsv">${Math.round(usedPct)}%</div></div>
-      <div class="hs"><div class="hsk">Recent spend</div><div class="hsv pos">+${money(recent)}</div></div>
+      <div class="hs clk" data-bmetric="actual"><div class="hsk">Actual</div><div class="hsv">${money(scopeAll?totalA:scopedActual)}</div></div>
+      ${scopeAll
+        ? `<div class="hs clk" data-bmetric="remaining"><div class="hsk">Remaining</div><div class="hsv">${money(remaining)}</div></div>`
+        : `<div class="hs"><div class="hsk">Hours logged</div><div class="hsv">${Math.round(memberActualHours(budgetScope)*10)/10}h</div></div>`}
+      <div class="hs clk" data-bmetric="used"><div class="hsk">Used</div><div class="hsv">${Math.round(usedPct)}%</div></div>
+      <div class="hs clk" data-bmetric="recent"><div class="hsk">Recent spend</div><div class="hsv pos">+${money(recent)}</div></div>
     </div>
     <div class="chiprow">${chips}</div>
     <div class="trendwrap"><div class="pillrow">${phases}</div>${costTrend()}</div>
@@ -3222,6 +3302,7 @@ $("#viewBudget").addEventListener("change",ev=>{
 $("#viewBudget").addEventListener("click",ev=>{
   const bv=ev.target.closest("[data-bview]");
   if(bv){ budgetView=bv.dataset.bview; localStorage.setItem("eh_bview",budgetView); renderBudget(); return; }
+  const bm=ev.target.closest("[data-bmetric]"); if(bm){ openBudgetMetric(bm.dataset.bmetric); return; }
   const bs=ev.target.closest("[data-bscope]"); if(bs){ budgetScope=bs.dataset.bscope; renderBudget(); return; }
   const br=ev.target.closest("[data-brange]"); if(br){ budgetRange=br.dataset.brange; renderBudget(); return; }
   const add=ev.target.closest("[data-add]"), del=ev.target.closest("[data-del]");
